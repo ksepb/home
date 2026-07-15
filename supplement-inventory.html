@@ -233,6 +233,10 @@
   .ocr-item .remove{
     background:none; border:none; color:var(--coral); font-size:12px; font-weight:700; cursor:pointer;
   }
+  .dup-badge{
+    display:inline-block; font-size:11px; font-weight:700; color:var(--amber);
+    background:var(--amber-soft); padding:3px 8px; border-radius:8px; margin-bottom:8px;
+  }
 
   .loading-state{
     display:flex; flex-direction:column; align-items:center; padding:36px 10px; gap:12px;
@@ -258,6 +262,79 @@
     font-size:11px; color:var(--coral); background:var(--coral-soft);
     padding:4px 8px; border-radius:8px; border:none; font-weight:700;
   }
+  .tab-bar{
+    display:flex; gap:4px;
+    background:rgba(255,255,255,0.55);
+    border:1px solid var(--glass-border);
+    backdrop-filter:blur(14px);
+    border-radius:14px;
+    padding:4px;
+    margin:14px 16px 0;
+  }
+  .tab-btn{
+    flex:1; border:none; background:transparent; padding:9px 10px;
+    border-radius:10px; font-size:13.5px; font-weight:700;
+    color:var(--ink-soft); cursor:pointer;
+    transition:background .2s ease, color .2s ease;
+  }
+  .tab-btn.active{
+    background:linear-gradient(135deg, var(--teal), var(--teal-deep));
+    color:white;
+    box-shadow:0 4px 14px rgba(44,122,92,0.3);
+  }
+
+  .stat-card{
+    background:var(--glass-bg);
+    border:1px solid var(--glass-border);
+    backdrop-filter:blur(16px) saturate(160%);
+    border-radius:20px;
+    box-shadow:var(--shadow);
+    padding:16px;
+    margin-bottom:14px;
+  }
+  .stat-card h3{
+    margin:0 0 12px; font-size:14px; font-weight:700; color:var(--ink);
+    display:flex; align-items:center; gap:6px;
+  }
+  .big-stats{
+    display:flex; gap:10px; margin-bottom:14px;
+  }
+  .big-stat{
+    flex:1; text-align:center; padding:16px 8px;
+    background:var(--glass-bg); border:1px solid var(--glass-border);
+    backdrop-filter:blur(14px); border-radius:18px; box-shadow:var(--shadow);
+  }
+  .big-stat .num{
+    font-size:26px; font-weight:800; color:var(--teal-deep);
+    font-variant-numeric:tabular-nums; line-height:1.1;
+  }
+  .big-stat .label{font-size:11.5px; color:var(--ink-soft); margin-top:4px; font-weight:600;}
+
+  .cat-row{margin-bottom:14px;}
+  .cat-row:last-child{margin-bottom:0;}
+  .cat-row .cat-top{
+    display:flex; justify-content:space-between; align-items:baseline;
+    font-size:13px; margin-bottom:6px;
+  }
+  .cat-row .cat-name{font-weight:700; color:var(--ink);}
+  .cat-row .cat-count{color:var(--ink-soft); font-size:12px;}
+  .cat-bar-bg{
+    height:8px; border-radius:6px; background:rgba(0,0,0,0.06); overflow:hidden;
+  }
+  .cat-bar-fg{
+    height:100%; border-radius:6px;
+    background:linear-gradient(90deg, var(--teal), var(--teal-deep));
+    transition:width .4s ease;
+  }
+
+  .recent-row{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:10px 0; border-bottom:1px solid rgba(0,0,0,0.05);
+    font-size:13px;
+  }
+  .recent-row:last-child{border-bottom:none;}
+  .recent-row .rn{font-weight:600; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:60%;}
+  .recent-row .rd{color:var(--ink-soft); font-size:12px; font-variant-numeric:tabular-nums;}
 </style>
 </head>
 <body>
@@ -268,8 +345,14 @@
   <div class="summary-row" id="summaryRow"></div>
 </div>
 
+<div class="tab-bar">
+  <button class="tab-btn active" id="tabList">📦 庫存清單</button>
+  <button class="tab-btn" id="tabOverview">📊 總覽統計</button>
+</div>
+
 <main>
   <div id="listArea"></div>
+  <div id="overviewArea" style="display:none;"></div>
 </main>
 
 <div class="fab-row">
@@ -282,7 +365,7 @@
   <div class="sheet">
     <div class="sheet-handle"></div>
     <h3>貼上訂單文字</h3>
-    <p class="hint">在 iHerb 訂單詳情頁面，長按畫面上的文字選取後複製（iPhone 截圖也可以用「即時文字辨識」框選複製），再貼到下面，會自動抓出商品名稱與數量。</p>
+    <p class="hint">在 iHerb 訂單詳情頁面，連同「送達日期」一起長按選取複製（iPhone 截圖也可以用「即時文字辨識」框選複製），再貼到下面，會自動抓出商品名稱、數量與購買日期。</p>
     <div class="field">
       <textarea id="pasteText" placeholder="在這裡貼上訂單文字…" style="width:100%; min-height:160px; padding:12px; border-radius:12px; border:1px solid rgba(0,0,0,0.08); font-size:14px; font-family:inherit; resize:vertical;"></textarea>
     </div>
@@ -328,6 +411,14 @@
     <div class="field">
       <label>每日服用量（選填，用來估算可用天數）</label>
       <input type="number" id="mDaily" placeholder="例如：2" min="0" step="0.5">
+    </div>
+    <div class="field">
+      <label>購買日期（已送達日期，選填）</label>
+      <input type="date" id="mPurchaseDate">
+    </div>
+    <div class="field">
+      <label>購買單價（NT$，選填）</label>
+      <input type="number" id="mUnitPrice" placeholder="例如：939" min="0">
     </div>
     <button class="btn-block primary" id="mSave">加入庫存</button>
     <button class="btn-block ghost" id="mCancel">取消</button>
@@ -410,6 +501,7 @@ function render(){
         <h2>還沒有任何庫存</h2>
         <p>拍下你的 iHerb 訂單截圖，或手動新增第一個品項</p>
       </div>`;
+    renderOverview();
     return;
   }
 
@@ -427,11 +519,13 @@ function render(){
     <div class="card" data-id="${item.id}">
       ${renderRing(item)}
       <div class="card-body">
-        <p class="card-title">${escapeHtml(item.name)}</p>
+        <p class="card-title">${escapeHtml(chineseName(item.name))}</p>
         <div class="card-meta">
           <span class="tag">${item.category || '💊 其他'}</span>
           <span>庫存 <span class="stock-num">${item.qty}</span></span>
           ${d !== null ? `<span>· 每日 ${item.daily}</span>` : ''}
+          ${item.purchaseDate ? `<span>· 購入 ${formatDate(item.purchaseDate)}</span>` : ''}
+          ${item.unitPrice != null && item.unitPrice !== '' ? `<span>· NT$${item.unitPrice}</span>` : ''}
         </div>
       </div>
       <div class="stepper">
@@ -448,10 +542,126 @@ function render(){
     card.querySelector('.dec').addEventListener('click', () => changeQty(id, -1));
     card.addEventListener('dblclick', () => { if(confirm('刪除此品項？')) deleteItem(id); });
   });
+
+  renderOverview();
+}
+
+const CATEGORIES = ['🧬 維他命','🦠 益生菌','🐟 魚油/Omega','⚙️ 礦物質','💊 其他'];
+
+function renderOverview(){
+  const overviewArea = document.getElementById('overviewArea');
+
+  if(items.length === 0){
+    overviewArea.innerHTML = `
+      <div class="empty-state">
+        <div class="icon">📊</div>
+        <h2>還沒有統計資料</h2>
+        <p>加入品項後，這裡會顯示庫存總覽</p>
+      </div>`;
+    return;
+  }
+
+  const totalItems = items.length;
+  const totalQty = items.reduce((sum, i) => sum + Number(i.qty || 0), 0);
+  const totalBottles = items.reduce((sum, i) => sum + (i.qty > 0 ? 1 : 0), 0);
+  const lowCount = items.filter(i => {
+    const d = daysLeft(i);
+    return (d !== null && d <= 7) || i.qty <= 1;
+  }).length;
+
+  // 依分類統計
+  const catStats = CATEGORIES.map(cat => {
+    const catItems = items.filter(i => (i.category || '💊 其他') === cat);
+    return {
+      cat,
+      count: catItems.length,
+      qty: catItems.reduce((sum, i) => sum + Number(i.qty || 0), 0)
+    };
+  }).filter(c => c.count > 0);
+  const maxQty = Math.max(1, ...catStats.map(c => c.qty));
+
+  // 最近購買
+  const recent = [...items]
+    .filter(i => i.purchaseDate)
+    .sort((a,b) => b.purchaseDate.localeCompare(a.purchaseDate))
+    .slice(0, 5);
+
+  // 依單價估算目前庫存價值（僅計入有填單價的品項，數量以目前剩餘庫存計算）
+  const pricedItems = items.filter(i => i.unitPrice != null && i.unitPrice !== '');
+  const stockValue = pricedItems.reduce((sum, i) => sum + Number(i.unitPrice) * Number(i.qty || 0), 0);
+
+  overviewArea.innerHTML = `
+    <div class="big-stats">
+      <div class="big-stat">
+        <div class="num">${totalItems}</div>
+        <div class="label">品項種類</div>
+      </div>
+      <div class="big-stat">
+        <div class="num">${totalQty}</div>
+        <div class="label">總庫存數量</div>
+      </div>
+      <div class="big-stat">
+        <div class="num">${lowCount}</div>
+        <div class="label">即將用完</div>
+      </div>
+    </div>
+
+    ${pricedItems.length > 0 ? `
+    <div class="stat-card">
+      <h3>💰 目前庫存估值</h3>
+      <div class="big-stats" style="margin-bottom:0;">
+        <div class="big-stat" style="flex:1;">
+          <div class="num">NT$${stockValue.toLocaleString()}</div>
+          <div class="label">依單價 × 剩餘數量估算</div>
+        </div>
+      </div>
+    </div>` : ''}
+
+    <div class="stat-card">
+      <h3>📂 分類統計</h3>
+      ${catStats.map(c => `
+        <div class="cat-row">
+          <div class="cat-top">
+            <span class="cat-name">${c.cat}</span>
+            <span class="cat-count">${c.count} 項品項 · 共 ${c.qty} 份</span>
+          </div>
+          <div class="cat-bar-bg">
+            <div class="cat-bar-fg" style="width:${Math.round(c.qty / maxQty * 100)}%"></div>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+
+    ${recent.length > 0 ? `
+    <div class="stat-card">
+      <h3>🕒 最近購買</h3>
+      ${recent.map(i => `
+        <div class="recent-row">
+          <span class="rn">${escapeHtml(chineseName(i.name))}</span>
+          <span class="rd">${formatDate(i.purchaseDate)}${i.unitPrice != null && i.unitPrice !== '' ? ' · NT$' + i.unitPrice : ''}</span>
+        </div>
+      `).join('')}
+    </div>` : ''}
+  `;
 }
 
 function escapeHtml(s){
   const d = document.createElement('div'); d.textContent = s; return d.innerHTML;
+}
+
+// 只取商品名稱中的中文部分顯示（英文品牌/型號名保留在資料裡，僅顯示時過濾）
+function chineseName(name){
+  if(!name) return name;
+  const matches = name.match(/[\u3400-\u9FFF]+/g);
+  if(!matches || matches.length === 0) return name; // 沒有中文就顯示原名，避免空白
+  return matches.join(' ');
+}
+
+function formatDate(iso){
+  if(!iso) return '';
+  const [y, m, d] = iso.split('-');
+  if(!y) return iso;
+  return `${y}/${m}/${d}`;
 }
 
 function changeQty(id, delta){
@@ -481,13 +691,18 @@ document.getElementById('mSave').addEventListener('click', () => {
   const qty = parseFloat(document.getElementById('mQty').value) || 0;
   const category = document.getElementById('mCategory').value;
   const daily = parseFloat(document.getElementById('mDaily').value) || 0;
+  const purchaseDate = document.getElementById('mPurchaseDate').value || '';
+  const unitPriceVal = document.getElementById('mUnitPrice').value;
+  const unitPrice = unitPriceVal === '' ? null : parseInt(unitPriceVal) || 0;
   if(!name){ showToast('請輸入商品名稱'); return; }
-  items.push({ id: uid(), name, qty, category, daily });
+  items.push({ id: uid(), name, qty, category, daily, purchaseDate, unitPrice });
   save();
   manualOverlay.classList.remove('show');
   document.getElementById('mName').value = '';
   document.getElementById('mQty').value = 1;
   document.getElementById('mDaily').value = '';
+  document.getElementById('mPurchaseDate').value = '';
+  document.getElementById('mUnitPrice').value = '';
   showToast('已加入庫存');
 });
 
@@ -523,29 +738,57 @@ function guessCategory(name){
 }
 
 // 解析從 iHerb 訂單詳情複製出來的文字
-// 期望格式（每行）：商品名稱（可能多行）→ 單價：NT$xxx → 數量: N → 總價格：NT$xxx
+// 期望格式（每行）：送達日期 → 2026年6月18日 → 商品名稱（可能多行）→ 單價：NT$xxx → 數量: N → 總價格：NT$xxx
 function parseOrderText(raw){
   const noiseLines = [
-    '退款/退貨','退款／退貨','訂單詳情','已送達','送達日期','撰寫評論','再次購買',
+    '退款/退貨','退款／退貨','訂單詳情','已送達','撰寫評論','再次購買',
     '首頁','探索','類別','購物車','我的帳戶','訂單摘要','訂單總計'
   ];
   const lines = raw.split('\n')
     .map(l => l.trim())
     .filter(l => l.length > 0)
-    .filter(l => !noiseLines.includes(l))
-    .filter(l => !/^\d{4}年\d{1,2}月\d{1,2}日$/.test(l)); // 純日期行
+    .filter(l => !noiseLines.includes(l));
 
   const results = [];
   let nameBuffer = [];
+  let currentDate = '';
+  let expectDateNext = false;
+  let currentPrice = null;
+
+  const dateLineRegex = /^(\d{4})年(\d{1,2})月(\d{1,2})日$/;
 
   for(let i = 0; i < lines.length; i++){
     const line = lines[i];
+
+    if(line === '送達日期'){
+      expectDateNext = true;
+      continue;
+    }
+    if(expectDateNext){
+      expectDateNext = false;
+      const m = line.match(dateLineRegex);
+      if(m){
+        const [, y, mo, d] = m;
+        currentDate = `${y}-${mo.padStart(2,'0')}-${d.padStart(2,'0')}`;
+        continue;
+      }
+      // 不是預期的日期格式，當一般行繼續往下處理
+    }
+    // 沒有透過「送達日期」標題出現的獨立日期行，也順手抓一下
+    const looseDate = line.match(dateLineRegex);
+    if(looseDate){
+      const [, y, mo, d] = looseDate;
+      currentDate = `${y}-${mo.padStart(2,'0')}-${d.padStart(2,'0')}`;
+      continue;
+    }
+
     const qtyMatch = line.match(/數量[:：]\s*(\d+)/);
-    const priceLine = /^單價/.test(line);
+    const priceMatch = line.match(/^單價[:：]?\s*NT?\$?\s*([\d,]+)/);
     const totalLine = /^總價格/.test(line);
 
-    if(priceLine){
-      continue; // 單價行不併入名稱，也不用來解析
+    if(priceMatch){
+      currentPrice = parseInt(priceMatch[1].replace(/,/g,'')) || null;
+      continue; // 單價行不併入名稱
     }
     if(qtyMatch){
       const name = nameBuffer.join(' ').replace(/\s+/g,' ').trim();
@@ -553,14 +796,17 @@ function parseOrderText(raw){
         results.push({
           name,
           quantity: parseInt(qtyMatch[1]) || 1,
-          category: guessCategory(name)
+          category: guessCategory(name),
+          purchaseDate: currentDate,
+          unitPrice: currentPrice
         });
       }
       nameBuffer = [];
+      currentPrice = null;
       continue;
     }
     if(totalLine){
-      continue;
+      continue; // 總價格不需要，略過
     }
     // 純數字/價格行，略過（避免混入名稱）
     if(/^NT\$?[\d,]+$/.test(line)) continue;
@@ -582,9 +828,21 @@ function renderOcrPreview(parsedItems){
     return;
   }
   ocrDraft = parsedItems.map(it => ({
-    id: uid(), name: it.name || '未命名商品', qty: it.quantity || 1, category: it.category || '💊 其他'
+    id: uid(), name: it.name || '未命名商品', qty: it.quantity || 1,
+    category: it.category || '💊 其他', purchaseDate: it.purchaseDate || '',
+    unitPrice: it.unitPrice != null ? it.unitPrice : ''
   }));
   renderOcrList();
+}
+
+// 檢查是否與現有庫存中的品項重複（名稱、數量、購買日期皆相同）
+function isDuplicate(candidate){
+  const name = (candidate.name || '').trim();
+  return items.some(existing =>
+    existing.name.trim() === name &&
+    Number(existing.qty) === Number(candidate.qty) &&
+    (existing.purchaseDate || '') === (candidate.purchaseDate || '')
+  );
 }
 
 function renderOcrList(){
@@ -598,6 +856,7 @@ function renderOcrList(){
   const listEl = document.getElementById('ocrItemsList');
   listEl.innerHTML = ocrDraft.map(it => `
     <div class="ocr-item" data-id="${it.id}">
+      ${isDuplicate(it) ? `<span class="dup-badge">⚠️ 可能與現有庫存重複</span>` : ''}
       <div class="row">
         <input type="text" class="ocr-name" value="${escapeHtml(it.name)}" placeholder="商品名稱">
       </div>
@@ -608,6 +867,18 @@ function renderOcrList(){
             `<option value="${c}" ${c===it.category?'selected':''}>${c}</option>`).join('')}
         </select>
         <button class="remove">刪除</button>
+      </div>
+      <div class="row">
+        <label style="font-size:11px; color:var(--ink-soft); display:flex; align-items:center; gap:6px; width:100%;">
+          購買日期
+          <input type="date" class="ocr-date" value="${it.purchaseDate}" style="flex:1; padding:8px 10px; border-radius:10px; border:1px solid rgba(0,0,0,0.08); font-size:13px;">
+        </label>
+      </div>
+      <div class="row">
+        <label style="font-size:11px; color:var(--ink-soft); display:flex; align-items:center; gap:6px; width:100%;">
+          單價 (NT$)
+          <input type="number" class="ocr-price" value="${it.unitPrice}" min="0" placeholder="選填" style="flex:1; padding:8px 10px; border-radius:10px; border:1px solid rgba(0,0,0,0.08); font-size:13px;">
+        </label>
       </div>
     </div>
   `).join('');
@@ -623,6 +894,12 @@ function renderOcrList(){
     row.querySelector('.ocr-cat').addEventListener('change', e => {
       ocrDraft.find(x=>x.id===id).category = e.target.value;
     });
+    row.querySelector('.ocr-date').addEventListener('input', e => {
+      ocrDraft.find(x=>x.id===id).purchaseDate = e.target.value;
+    });
+    row.querySelector('.ocr-price').addEventListener('input', e => {
+      ocrDraft.find(x=>x.id===id).unitPrice = e.target.value === '' ? '' : parseInt(e.target.value) || 0;
+    });
     row.querySelector('.remove').addEventListener('click', () => {
       ocrDraft = ocrDraft.filter(x => x.id !== id);
       renderOcrList();
@@ -630,8 +907,30 @@ function renderOcrList(){
   });
 
   document.getElementById('ocrConfirm').addEventListener('click', () => {
+    const dupItems = ocrDraft.filter(isDuplicate);
+
+    if(dupItems.length > 0){
+      const dupNames = dupItems.map(it => `・${it.name}（數量 ${it.qty}${it.purchaseDate ? '，' + formatDate(it.purchaseDate) : ''}）`).join('\n');
+      const confirmAll = confirm(
+        `有 ${dupItems.length} 項商品的名稱、數量、購買日期都與現有庫存相同，可能是重複訂單：\n\n${dupNames}\n\n按「確定」仍新增全部品項，按「取消」則只新增其餘不重複的品項。`
+      );
+      const toAdd = confirmAll ? ocrDraft : ocrDraft.filter(it => !isDuplicate(it));
+      toAdd.forEach(it => {
+        items.push({ id: uid(), name: it.name, qty: it.qty, category: it.category, daily: 0, purchaseDate: it.purchaseDate || '', unitPrice: it.unitPrice === '' ? null : it.unitPrice });
+      });
+      save();
+      ocrOverlay.classList.remove('show');
+      if(toAdd.length === 0){
+        showToast('已略過所有重複品項');
+      }else{
+        showToast(confirmAll ? `已加入 ${toAdd.length} 項商品` : `已加入 ${toAdd.length} 項（略過 ${dupItems.length} 項重複）`);
+      }
+      ocrDraft = [];
+      return;
+    }
+
     ocrDraft.forEach(it => {
-      items.push({ id: uid(), name: it.name, qty: it.qty, category: it.category, daily: 0 });
+      items.push({ id: uid(), name: it.name, qty: it.qty, category: it.category, daily: 0, purchaseDate: it.purchaseDate || '', unitPrice: it.unitPrice === '' ? null : it.unitPrice });
     });
     save();
     ocrOverlay.classList.remove('show');
@@ -646,6 +945,25 @@ function renderOcrList(){
 
 ocrOverlay.addEventListener('click', (e) => {
   if(e.target === ocrOverlay){ ocrOverlay.classList.remove('show'); ocrDraft = []; }
+});
+
+// ---------- 分頁切換 ----------
+const tabList = document.getElementById('tabList');
+const tabOverview = document.getElementById('tabOverview');
+const listAreaEl = document.getElementById('listArea');
+const overviewAreaEl = document.getElementById('overviewArea');
+
+tabList.addEventListener('click', () => {
+  tabList.classList.add('active');
+  tabOverview.classList.remove('active');
+  listAreaEl.style.display = '';
+  overviewAreaEl.style.display = 'none';
+});
+tabOverview.addEventListener('click', () => {
+  tabOverview.classList.add('active');
+  tabList.classList.remove('active');
+  listAreaEl.style.display = 'none';
+  overviewAreaEl.style.display = '';
 });
 
 render();
