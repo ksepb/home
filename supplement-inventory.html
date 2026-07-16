@@ -873,11 +873,24 @@ function escapeHtml(s){
 }
 
 // 只取商品名稱中的中文部分顯示（英文品牌/型號名保留在資料裡，僅顯示時過濾）
+// 顯示名稱時要過濾掉的常見形容/單位詞（不影響原始資料，只影響顯示）
+const NAME_STOPWORDS = [
+  '超濃縮','高吸收','快速吸收','緩釋','速溶','高濃度',
+  '素食膠囊','軟膠囊','膠囊','錠劑','錠','粒',
+  '素食','天然','有機','非基改','無麩質','不含麩質',
+  '活性','優質','進口','來自','萃取物','提取物','配方'
+];
+
 function chineseName(name){
   if(!name) return name;
   const matches = name.match(/[\u3400-\u9FFF]+/g);
   if(!matches || matches.length === 0) return name; // 沒有中文就顯示原名，避免空白
-  return matches.join(' ');
+  let joined = matches.join(' ');
+  NAME_STOPWORDS.forEach(word => {
+    joined = joined.split(word).join('');
+  });
+  joined = joined.replace(/\s+/g, ' ').trim();
+  return joined || matches.join(' '); // 過濾到只剩空字串時，退回未過濾的中文名稱
 }
 
 function formatDate(iso){
