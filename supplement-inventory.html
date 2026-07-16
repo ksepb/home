@@ -114,10 +114,11 @@
   }
   .ring .label .num{font-size:13px; color:var(--ink);}
 
-  .card-body{flex:1; min-width:0;}
+  .card-body{flex:1; min-width:0; cursor:pointer;}
   .card-title{
-    font-size:15px; font-weight:700; margin:0 0 2px;
-    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    font-size:15px; font-weight:700; margin:0 0 3px;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
+    overflow:hidden; line-height:1.3;
   }
   .card-meta{
     font-size:12px; color:var(--ink-soft); display:flex; gap:8px; align-items:center; flex-wrap:wrap;
@@ -335,6 +336,60 @@
   .recent-row:last-child{border-bottom:none;}
   .recent-row .rn{font-weight:600; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:60%;}
   .recent-row .rd{color:var(--ink-soft); font-size:12px; font-variant-numeric:tabular-nums;}
+
+  /* 搜尋 / 排序 / 篩選工具列 */
+  .list-toolbar{margin-bottom:14px;}
+  .search-box{
+    display:flex; align-items:center; gap:8px;
+    background:var(--glass-bg); border:1px solid var(--glass-border);
+    backdrop-filter:blur(14px); border-radius:14px; padding:10px 14px;
+    margin-bottom:10px;
+  }
+  .search-box input{
+    flex:1; border:none; background:transparent; font-size:14px; color:var(--ink);
+    outline:none;
+  }
+  .search-box .clear-search{
+    border:none; background:none; color:var(--ink-soft); font-size:14px; cursor:pointer; padding:2px;
+  }
+  .filter-row{
+    display:flex; gap:8px; overflow-x:auto; padding-bottom:2px; scrollbar-width:none;
+  }
+  .filter-row::-webkit-scrollbar{display:none;}
+  .filter-chip{
+    flex:0 0 auto; border:1px solid var(--glass-border); background:var(--glass-bg);
+    backdrop-filter:blur(10px); border-radius:12px; padding:7px 13px;
+    font-size:12.5px; font-weight:600; color:var(--ink-soft); white-space:nowrap; cursor:pointer;
+  }
+  .filter-chip.active{
+    background:linear-gradient(135deg, var(--teal), var(--teal-deep)); color:white; border-color:transparent;
+  }
+  .sort-select{
+    margin-top:10px; width:100%; padding:9px 12px; border-radius:12px;
+    border:1px solid rgba(0,0,0,0.08); background:white; font-size:13px; color:var(--ink);
+  }
+
+  /* 消耗趨勢圖表 */
+  .trend-chart{
+    display:flex; align-items:flex-end; gap:4px; height:90px; margin-bottom:6px;
+  }
+  .trend-bar-wrap{
+    flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%;
+  }
+  .trend-bar{
+    width:100%; max-width:16px; border-radius:4px 4px 0 0;
+    background:linear-gradient(180deg, var(--teal), var(--teal-deep));
+    min-height:2px;
+  }
+  .trend-labels{
+    display:flex; gap:4px;
+  }
+  .trend-labels span{
+    flex:1; text-align:center; font-size:9px; color:var(--ink-soft);
+  }
+
+  .backup-btn-row{display:flex; gap:8px;}
+  .backup-btn-row .btn-block{margin-top:0;}
 </style>
 </head>
 <body>
@@ -351,7 +406,23 @@
 </div>
 
 <main>
-  <div id="listArea"></div>
+  <div id="listArea">
+    <div class="list-toolbar">
+      <div class="search-box">
+        <span>🔍</span>
+        <input type="text" id="searchInput" placeholder="搜尋商品名稱…">
+        <button class="clear-search" id="clearSearch" style="display:none;">✕</button>
+      </div>
+      <div class="filter-row" id="filterRow"></div>
+      <select class="sort-select" id="sortSelect">
+        <option value="default">預設排序（即將用完優先）</option>
+        <option value="name">依名稱排序</option>
+        <option value="qty">依庫存數量（少→多）</option>
+        <option value="date">依購買日期（新→舊）</option>
+      </select>
+    </div>
+    <div id="listItems"></div>
+  </div>
   <div id="overviewArea" style="display:none;"></div>
 </main>
 
@@ -425,6 +496,52 @@
   </div>
 </div>
 
+<!-- 編輯品項 sheet -->
+<div class="sheet-overlay" id="editOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <h3>編輯品項</h3>
+    <p class="hint">修改後儲存即可更新這筆庫存</p>
+    <div class="field">
+      <label>商品名稱</label>
+      <input type="text" id="eName">
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>數量</label>
+        <input type="number" id="eQty" min="0">
+      </div>
+      <div class="field">
+        <label>分類</label>
+        <select id="eCategory">
+          <option value="🧬 維他命">🧬 維他命</option>
+          <option value="🦠 益生菌">🦠 益生菌</option>
+          <option value="🐟 魚油/Omega">🐟 魚油/Omega</option>
+          <option value="⚙️ 礦物質">⚙️ 礦物質</option>
+          <option value="💊 其他">💊 其他</option>
+        </select>
+      </div>
+    </div>
+    <div class="field">
+      <label>每日服用量（選填）</label>
+      <input type="number" id="eDaily" min="0" step="0.5">
+    </div>
+    <div class="field">
+      <label>購買日期（選填）</label>
+      <input type="date" id="ePurchaseDate">
+    </div>
+    <div class="field">
+      <label>購買單價（NT$，選填）</label>
+      <input type="number" id="eUnitPrice" min="0">
+    </div>
+    <button class="btn-block primary" id="eSave">儲存變更</button>
+    <button class="btn-block ghost" id="eDelete" style="color:var(--coral);">刪除此品項</button>
+    <button class="btn-block ghost" id="eCancel">取消</button>
+  </div>
+</div>
+
+<input type="file" id="importFileInput" accept="application/json">
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -476,6 +593,10 @@ function renderRing(item){
     </div>`;
 }
 
+let searchQuery = '';
+let sortMode = 'default';
+let categoryFilter = 'all';
+
 function render(){
   document.getElementById('dateLabel').textContent =
     new Date().toLocaleDateString('zh-TW', {year:'numeric', month:'long', day:'numeric', weekday:'short'});
@@ -493,9 +614,24 @@ function render(){
     <div class="chip ${out ? 'alert' : ''}">🚫 已缺貨 <b>${out}</b></div>
   `;
 
-  const listArea = document.getElementById('listArea');
+  // 篩選標籤（全部 + 有品項的分類）
+  const filterRow = document.getElementById('filterRow');
+  const usedCats = CATEGORIES.filter(cat => items.some(i => (i.category || '💊 其他') === cat));
+  filterRow.innerHTML = [
+    `<button class="filter-chip ${categoryFilter==='all'?'active':''}" data-cat="all">全部</button>`,
+    ...usedCats.map(cat => `<button class="filter-chip ${categoryFilter===cat?'active':''}" data-cat="${cat}">${cat}</button>`)
+  ].join('');
+  filterRow.querySelectorAll('.filter-chip').forEach(btn => {
+    btn.addEventListener('click', () => {
+      categoryFilter = btn.dataset.cat;
+      render();
+    });
+  });
+
+  const listItems = document.getElementById('listItems');
+
   if(items.length === 0){
-    listArea.innerHTML = `
+    listItems.innerHTML = `
       <div class="empty-state">
         <div class="icon">🧴</div>
         <h2>還沒有任何庫存</h2>
@@ -505,15 +641,45 @@ function render(){
     return;
   }
 
-  // sort: out of stock/low first
-  const sorted = [...items].sort((a,b)=>{
-    const da = daysLeft(a), db = daysLeft(b);
-    const scoreA = a.qty <= 0 ? -1 : (da !== null ? da : 99);
-    const scoreB = b.qty <= 0 ? -1 : (db !== null ? db : 99);
-    return scoreA - scoreB;
+  // 套用搜尋 + 分類篩選
+  let filtered = items.filter(i => {
+    if(categoryFilter !== 'all' && (i.category || '💊 其他') !== categoryFilter) return false;
+    if(searchQuery){
+      const q = searchQuery.toLowerCase();
+      const hay = (i.name || '').toLowerCase();
+      if(!hay.includes(q)) return false;
+    }
+    return true;
   });
 
-  listArea.innerHTML = sorted.map(item => {
+  // 排序
+  if(sortMode === 'name'){
+    filtered.sort((a,b) => chineseName(a.name).localeCompare(chineseName(b.name), 'zh-Hant'));
+  }else if(sortMode === 'qty'){
+    filtered.sort((a,b) => a.qty - b.qty);
+  }else if(sortMode === 'date'){
+    filtered.sort((a,b) => (b.purchaseDate || '').localeCompare(a.purchaseDate || ''));
+  }else{
+    filtered.sort((a,b)=>{
+      const da = daysLeft(a), db = daysLeft(b);
+      const scoreA = a.qty <= 0 ? -1 : (da !== null ? da : 99);
+      const scoreB = b.qty <= 0 ? -1 : (db !== null ? db : 99);
+      return scoreA - scoreB;
+    });
+  }
+
+  if(filtered.length === 0){
+    listItems.innerHTML = `
+      <div class="empty-state">
+        <div class="icon">🔍</div>
+        <h2>找不到符合的品項</h2>
+        <p>試試其他關鍵字或清除篩選</p>
+      </div>`;
+    renderOverview();
+    return;
+  }
+
+  listItems.innerHTML = filtered.map(item => {
     const d = daysLeft(item);
     return `
     <div class="card" data-id="${item.id}">
@@ -536,11 +702,11 @@ function render(){
     </div>`;
   }).join('');
 
-  listArea.querySelectorAll('.card').forEach(card => {
+  listItems.querySelectorAll('.card').forEach(card => {
     const id = card.dataset.id;
-    card.querySelector('.inc').addEventListener('click', () => changeQty(id, 1));
-    card.querySelector('.dec').addEventListener('click', () => changeQty(id, -1));
-    card.addEventListener('dblclick', () => { if(confirm('刪除此品項？')) deleteItem(id); });
+    card.querySelector('.inc').addEventListener('click', (e) => { e.stopPropagation(); changeQty(id, 1); });
+    card.querySelector('.dec').addEventListener('click', (e) => { e.stopPropagation(); changeQty(id, -1); });
+    card.querySelector('.card-body').addEventListener('click', () => openEdit(id));
   });
 
   renderOverview();
@@ -557,7 +723,20 @@ function renderOverview(){
         <div class="icon">📊</div>
         <h2>還沒有統計資料</h2>
         <p>加入品項後，這裡會顯示庫存總覽</p>
-      </div>`;
+      </div>
+      <div class="stat-card">
+        <h3>💾 資料備份</h3>
+        <p class="hint" style="margin-bottom:10px;">如果你有之前匯出的備份檔，可以在這裡匯入還原。</p>
+        <div class="backup-btn-row">
+          <button class="btn-block primary" id="exportBtn" style="margin-top:0;">匯出備份</button>
+          <button class="btn-block ghost" id="importBtn" style="margin-top:0;">匯入備份</button>
+        </div>
+      </div>
+    `;
+    document.getElementById('exportBtn').addEventListener('click', exportBackup);
+    document.getElementById('importBtn').addEventListener('click', () => {
+      document.getElementById('importFileInput').click();
+    });
     return;
   }
 
@@ -590,6 +769,20 @@ function renderOverview(){
   const pricedItems = items.filter(i => i.unitPrice != null && i.unitPrice !== '');
   const stockValue = pricedItems.reduce((sum, i) => sum + Number(i.unitPrice) * Number(i.qty || 0), 0);
 
+  // 消耗趨勢（最近 14 天，依 consumptionLog 統計）
+  const trendDays = [];
+  for(let i = 13; i >= 0; i--){
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const iso = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    trendDays.push(iso);
+  }
+  const trendCounts = trendDays.map(iso =>
+    consumptionLog.filter(l => l.date === iso).reduce((sum, l) => sum + Number(l.amount || 1), 0)
+  );
+  const maxTrend = Math.max(1, ...trendCounts);
+  const hasTrendData = trendCounts.some(c => c > 0);
+
   overviewArea.innerHTML = `
     <div class="big-stats">
       <div class="big-stat">
@@ -618,6 +811,22 @@ function renderOverview(){
     </div>` : ''}
 
     <div class="stat-card">
+      <h3>📈 消耗趨勢（近 14 天）</h3>
+      ${hasTrendData ? `
+        <div class="trend-chart">
+          ${trendCounts.map(c => `
+            <div class="trend-bar-wrap">
+              <div class="trend-bar" style="height:${Math.round(c / maxTrend * 100)}%" title="${c} 份"></div>
+            </div>
+          `).join('')}
+        </div>
+        <div class="trend-labels">
+          ${trendDays.map((iso, idx) => `<span>${idx % 3 === 0 ? iso.slice(5).replace('-','/') : ''}</span>`).join('')}
+        </div>
+      ` : `<p class="hint" style="margin:0;">按庫存清單裡的「−」按鈕扣除庫存後，這裡會顯示每天的消耗量</p>`}
+    </div>
+
+    <div class="stat-card">
       <h3>📂 分類統計</h3>
       ${catStats.map(c => `
         <div class="cat-row">
@@ -642,7 +851,21 @@ function renderOverview(){
         </div>
       `).join('')}
     </div>` : ''}
+
+    <div class="stat-card">
+      <h3>💾 資料備份</h3>
+      <p class="hint" style="margin-bottom:10px;">資料目前只存在這台裝置的瀏覽器裡，清除瀏覽器資料會遺失。建議定期匯出備份。</p>
+      <div class="backup-btn-row">
+        <button class="btn-block primary" id="exportBtn" style="margin-top:0;">匯出備份</button>
+        <button class="btn-block ghost" id="importBtn" style="margin-top:0;">匯入備份</button>
+      </div>
+    </div>
   `;
+
+  document.getElementById('exportBtn').addEventListener('click', exportBackup);
+  document.getElementById('importBtn').addEventListener('click', () => {
+    document.getElementById('importFileInput').click();
+  });
 }
 
 function escapeHtml(s){
@@ -664,12 +887,28 @@ function formatDate(iso){
   return `${y}/${m}/${d}`;
 }
 
+const CONSUMPTION_LOG_KEY = 'supp_consumption_log_v1';
+let consumptionLog = JSON.parse(localStorage.getItem(CONSUMPTION_LOG_KEY) || '[]');
+
+function saveConsumptionLog(){
+  localStorage.setItem(CONSUMPTION_LOG_KEY, JSON.stringify(consumptionLog));
+}
+
+function todayISO(){
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
 function changeQty(id, delta){
   const item = items.find(i => i.id === id);
   if(!item) return;
   item.qty = Math.max(0, item.qty + delta);
   save();
-  if(delta < 0) showToast(`已扣除 1 份 · ${item.name}`);
+  if(delta < 0){
+    showToast(`已扣除 1 份 · ${item.name}`);
+    consumptionLog.push({ date: todayISO(), itemId: id, itemName: item.name, amount: Math.abs(delta) });
+    saveConsumptionLog();
+  }
 }
 
 function deleteItem(id){
@@ -704,6 +943,130 @@ document.getElementById('mSave').addEventListener('click', () => {
   document.getElementById('mPurchaseDate').value = '';
   document.getElementById('mUnitPrice').value = '';
   showToast('已加入庫存');
+});
+
+// ---------- 編輯品項 ----------
+const editOverlay = document.getElementById('editOverlay');
+let editingId = null;
+
+function openEdit(id){
+  const item = items.find(i => i.id === id);
+  if(!item) return;
+  editingId = id;
+  document.getElementById('eName').value = item.name || '';
+  document.getElementById('eQty').value = item.qty;
+  document.getElementById('eCategory').value = item.category || '💊 其他';
+  document.getElementById('eDaily').value = item.daily || '';
+  document.getElementById('ePurchaseDate').value = item.purchaseDate || '';
+  document.getElementById('eUnitPrice').value = (item.unitPrice != null && item.unitPrice !== '') ? item.unitPrice : '';
+  editOverlay.classList.add('show');
+}
+
+document.getElementById('eCancel').addEventListener('click', () => { editOverlay.classList.remove('show'); editingId = null; });
+editOverlay.addEventListener('click', (e) => { if(e.target === editOverlay){ editOverlay.classList.remove('show'); editingId = null; } });
+
+document.getElementById('eSave').addEventListener('click', () => {
+  const item = items.find(i => i.id === editingId);
+  if(!item) return;
+  const name = document.getElementById('eName').value.trim();
+  if(!name){ showToast('請輸入商品名稱'); return; }
+  item.name = name;
+  item.qty = parseFloat(document.getElementById('eQty').value) || 0;
+  item.category = document.getElementById('eCategory').value;
+  item.daily = parseFloat(document.getElementById('eDaily').value) || 0;
+  item.purchaseDate = document.getElementById('ePurchaseDate').value || '';
+  const priceVal = document.getElementById('eUnitPrice').value;
+  item.unitPrice = priceVal === '' ? null : parseInt(priceVal) || 0;
+  save();
+  editOverlay.classList.remove('show');
+  editingId = null;
+  showToast('已更新品項');
+});
+
+document.getElementById('eDelete').addEventListener('click', () => {
+  if(!editingId) return;
+  if(confirm('確定要刪除此品項？此動作無法復原。')){
+    deleteItem(editingId);
+    editOverlay.classList.remove('show');
+    editingId = null;
+  }
+});
+
+// ---------- 搜尋 / 排序 ----------
+const searchInput = document.getElementById('searchInput');
+const clearSearchBtn = document.getElementById('clearSearch');
+
+searchInput.addEventListener('input', (e) => {
+  searchQuery = e.target.value.trim();
+  clearSearchBtn.style.display = searchQuery ? '' : 'none';
+  render();
+});
+clearSearchBtn.addEventListener('click', () => {
+  searchQuery = '';
+  searchInput.value = '';
+  clearSearchBtn.style.display = 'none';
+  render();
+});
+
+document.getElementById('sortSelect').addEventListener('change', (e) => {
+  sortMode = e.target.value;
+  render();
+});
+
+// ---------- 資料備份 ----------
+function exportBackup(){
+  const backup = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    items,
+    consumptionLog
+  };
+  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const dateStr = todayISO();
+  a.href = url;
+  a.download = `保健存量備份_${dateStr}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('已匯出備份檔案');
+}
+
+document.getElementById('importFileInput').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try{
+      const data = JSON.parse(reader.result);
+      if(!data || !Array.isArray(data.items)){
+        showToast('檔案格式不正確');
+        return;
+      }
+      const replace = confirm(
+        `這份備份檔包含 ${data.items.length} 筆品項資料。\n\n按「確定」會覆蓋取代目前所有資料，按「取消」則會合併加入（保留目前資料，不會刪除）。`
+      );
+      if(replace){
+        items = data.items;
+        consumptionLog = Array.isArray(data.consumptionLog) ? data.consumptionLog : [];
+      }else{
+        items = items.concat(data.items.map(it => ({ ...it, id: uid() })));
+        if(Array.isArray(data.consumptionLog)){
+          consumptionLog = consumptionLog.concat(data.consumptionLog);
+        }
+      }
+      save();
+      saveConsumptionLog();
+      showToast(replace ? '已覆蓋還原資料' : '已合併匯入資料');
+    }catch(err){
+      console.error(err);
+      showToast('讀取備份檔失敗，請確認檔案內容');
+    }
+    e.target.value = '';
+  };
+  reader.readAsText(file);
 });
 
 // ---------- 貼上訂單文字解析 ----------
@@ -835,14 +1198,20 @@ function renderOcrPreview(parsedItems){
   renderOcrList();
 }
 
-// 檢查是否與現有庫存中的品項重複（名稱、數量、購買日期皆相同）
+// 檢查是否與現有庫存中的品項重複（名稱、數量、購買日期、單價皆相同才算重複）
+// 加入單價比對是因為 iHerb 訂單頁面常把商品全名截斷（例如「...KD-Pur...」），
+// 導致不同規格（例如 90 粒裝 vs 30 粒裝）的同款商品名稱看起來一樣，
+// 這時單價往往是唯一能分辨出是不同商品的線索。
 function isDuplicate(candidate){
   const name = (candidate.name || '').trim();
-  return items.some(existing =>
-    existing.name.trim() === name &&
-    Number(existing.qty) === Number(candidate.qty) &&
-    (existing.purchaseDate || '') === (candidate.purchaseDate || '')
-  );
+  const candidatePrice = candidate.unitPrice === '' || candidate.unitPrice == null ? null : Number(candidate.unitPrice);
+  return items.some(existing => {
+    const existingPrice = existing.unitPrice === '' || existing.unitPrice == null ? null : Number(existing.unitPrice);
+    return existing.name.trim() === name &&
+      Number(existing.qty) === Number(candidate.qty) &&
+      (existing.purchaseDate || '') === (candidate.purchaseDate || '') &&
+      existingPrice === candidatePrice;
+  });
 }
 
 function renderOcrList(){
@@ -910,9 +1279,9 @@ function renderOcrList(){
     const dupItems = ocrDraft.filter(isDuplicate);
 
     if(dupItems.length > 0){
-      const dupNames = dupItems.map(it => `・${it.name}（數量 ${it.qty}${it.purchaseDate ? '，' + formatDate(it.purchaseDate) : ''}）`).join('\n');
+      const dupNames = dupItems.map(it => `・${it.name}（數量 ${it.qty}${it.purchaseDate ? '，' + formatDate(it.purchaseDate) : ''}${it.unitPrice !== '' && it.unitPrice != null ? '，NT$' + it.unitPrice : ''}）`).join('\n');
       const confirmAll = confirm(
-        `有 ${dupItems.length} 項商品的名稱、數量、購買日期都與現有庫存相同，可能是重複訂單：\n\n${dupNames}\n\n按「確定」仍新增全部品項，按「取消」則只新增其餘不重複的品項。`
+        `有 ${dupItems.length} 項商品的名稱、數量、購買日期、單價都與現有庫存相同，可能是重複訂單：\n\n${dupNames}\n\n按「確定」仍新增全部品項，按「取消」則只新增其餘不重複的品項。`
       );
       const toAdd = confirmAll ? ocrDraft : ocrDraft.filter(it => !isDuplicate(it));
       toAdd.forEach(it => {
