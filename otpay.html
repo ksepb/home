@@ -32,7 +32,7 @@
   header{
     background:var(--pine);
     color:#F1EFE9;
-    padding:28px 20px 22px;
+    padding:26px 20px 24px;
     position:relative;
     overflow:hidden;
   }
@@ -44,22 +44,28 @@
     background-image:repeating-linear-gradient(90deg, var(--gold) 0 10px, transparent 10px 22px);
     opacity:.8;
   }
+  .title-line{
+    display:flex;
+    align-items:baseline;
+    flex-wrap:wrap;
+    gap:8px;
+  }
   .eyebrow{
-    font-size:12px;
-    letter-spacing:.14em;
+    font-size:19px;
+    letter-spacing:.02em;
     color:var(--gold-soft);
     font-weight:500;
   }
+  .sep{
+    color:var(--gold);
+    font-size:19px;
+    opacity:.8;
+  }
   h1{
     font-family:'Noto Serif TC',serif;
-    font-size:24px;
-    margin:6px 0 4px;
+    font-size:19px;
+    margin:0;
     font-weight:700;
-  }
-  .sub{
-    font-size:13px;
-    color:#D6D3C4;
-    line-height:1.6;
   }
   main{
     max-width:640px;
@@ -351,9 +357,11 @@
 <body>
 
 <header>
-  <div class="eyebrow">環保局清潔隊</div>
-  <h1>加班費試算系統</h1>
-  <div class="sub">依勞基法第24條、第39條、第40條計算方式，比照勞動部月薪制加班費試算系統邏輯編製。</div>
+  <div class="title-line">
+    <span class="eyebrow">環保局清潔隊</span>
+    <span class="sep">×</span>
+    <h1>加班費試算系統</h1>
+  </div>
 </header>
 
 <main>
