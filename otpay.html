@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>清潔隊加班費試算系統</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#EEEBE4;
+    --surface:#FFFFFF;
+    --line:#DAD6CC;
+    --ink:#2A2825;
+    --muted:#6B6759;
+    --pine:#48503E;
+    --pine-2:#5A6449;
+    --gold:#AD7A40;
+    --gold-soft:#EADFC9;
+    --warn:#A5543C;
+    --warn-bg:#F5E4DC;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'Noto Sans TC',sans-serif;
+    font-variant-numeric:tabular-nums;
+    padding-bottom:60px;
+  }
+  header{
+    background:var(--pine);
+    color:#F1EFE9;
+    padding:28px 20px 22px;
+    position:relative;
+    overflow:hidden;
+  }
+  header::after{
+    content:"";
+    position:absolute;
+    left:0; right:0; bottom:0;
+    height:6px;
+    background-image:repeating-linear-gradient(90deg, var(--gold) 0 10px, transparent 10px 22px);
+    opacity:.8;
+  }
+  .eyebrow{
+    font-size:12px;
+    letter-spacing:.14em;
+    color:var(--gold-soft);
+    font-weight:500;
+  }
+  h1{
+    font-family:'Noto Serif TC',serif;
+    font-size:24px;
+    margin:6px 0 4px;
+    font-weight:700;
+  }
+  .sub{
+    font-size:13px;
+    color:#D6D3C4;
+    line-height:1.6;
+  }
+  main{
+    max-width:640px;
+    margin:0 auto;
+    padding:18px 16px 0;
+  }
+  .card{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:18px 16px;
+    margin-bottom:16px;
+  }
+  .card h2{
+    font-family:'Noto Serif TC',serif;
+    font-size:16px;
+    margin:0 0 4px;
+    color:var(--pine);
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .card h2 .n{
+    font-size:11px;
+    background:var(--pine);
+    color:#fff;
+    width:20px;height:20px;
+    border-radius:50%;
+    display:inline-flex;
+    align-items:center;justify-content:center;
+    font-weight:700;
+  }
+  .hint{
+    font-size:12.5px;
+    color:var(--muted);
+    margin:0 0 14px;
+    line-height:1.6;
+  }
+  label{
+    display:block;
+    font-size:13px;
+    font-weight:500;
+    margin-bottom:6px;
+    color:var(--pine-2);
+  }
+  input[type=number], select{
+    width:100%;
+    padding:10px 10px;
+    border:1px solid var(--line);
+    border-radius:7px;
+    font-size:15px;
+    font-family:inherit;
+    background:#FCFCFA;
+    color:var(--ink);
+    caret-color:var(--gold);
+  }
+  input[type=number]::selection{
+    background:var(--gold);
+    color:#fff;
+  }
+  select.count-select{
+    appearance:none;
+    -webkit-appearance:none;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2324402E' stroke-width='2.5'><path d='M6 9l6 6 6-6'/></svg>");
+    background-repeat:no-repeat;
+    background-position:right 10px center;
+    padding-right:30px;
+  }
+  input[type=number]:focus, select:focus{
+    outline:2px solid var(--gold);
+    outline-offset:1px;
+  }
+  .salary-row{margin-bottom:6px;}
+  .wage-out{
+    margin-top:10px;
+    font-size:13px;
+    color:var(--pine-2);
+    background:var(--gold-soft);
+    border-radius:7px;
+    padding:8px 10px;
+  }
+  .wage-out b{color:var(--pine);font-size:15px;}
+
+  .section-title{
+    font-weight:700;
+    font-size:13.5px;
+    color:var(--pine);
+    border-left:3px solid var(--gold);
+    padding-left:8px;
+    margin:18px 0 10px;
+  }
+  .card > .section-title:first-of-type{margin-top:2px;}
+  .grid2{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    grid-auto-flow:row;
+    column-gap:10px;
+    row-gap:6px;
+    align-items:end;
+  }
+  .grid2 label{font-size:12px;margin-bottom:0;}
+  .grid3{
+    display:grid;
+    grid-template-columns:1fr 1fr 1fr;
+    grid-auto-flow:row;
+    column-gap:10px;
+    row-gap:6px;
+    align-items:end;
+  }
+  .grid3 label{font-size:11.5px;margin-bottom:0;}
+
+  .night-row{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:12px;
+  }
+
+  .warn{
+    background:var(--warn-bg);
+    color:var(--warn);
+    border:1px solid #E7C4B8;
+    border-radius:8px;
+    padding:10px 12px;
+    font-size:12.5px;
+    line-height:1.6;
+    margin-top:10px;
+  }
+
+  button.calc{
+    width:100%;
+    padding:14px;
+    background:var(--pine);
+    color:#fff;
+    border:none;
+    border-radius:8px;
+    font-size:16px;
+    font-weight:700;
+    font-family:'Noto Serif TC',serif;
+    letter-spacing:.04em;
+    cursor:pointer;
+    margin:6px 0 22px;
+  }
+  button.calc:active{background:var(--pine-2);}
+
+  button.reset{
+    width:100%;
+    padding:12px;
+    background:transparent;
+    color:var(--pine-2);
+    border:1px solid var(--line);
+    border-radius:8px;
+    font-size:14px;
+    font-weight:500;
+    font-family:'Noto Sans TC',sans-serif;
+    cursor:pointer;
+    margin:0 0 22px;
+  }
+  button.reset:active{background:#EDEBE5;}
+
+  .result-card{
+    border:1px solid var(--pine);
+  }
+
+  .result-line{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    padding-top:9px;
+    font-size:14px;
+  }
+  .result-item{
+    border-bottom:1px solid var(--line);
+    padding-bottom:9px;
+  }
+  .result-item:last-of-type{border-bottom:none;}
+  .result-line .label{color:var(--pine-2);}
+  .result-line .amt{
+    font-weight:700;
+    font-size:15px;
+    color:var(--ink);
+  }
+  .formula{
+    font-size:11px;
+    color:var(--muted);
+    margin:1px 0 0;
+    line-height:1.5;
+  }
+  .result-total{
+    margin-top:10px;
+    padding-top:14px;
+    border-top:2px solid var(--pine);
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+  }
+  .result-total .label{
+    font-family:'Noto Serif TC',serif;
+    font-weight:700;
+    font-size:16px;
+    color:var(--pine);
+  }
+  .result-total .amt{
+    font-family:'Noto Serif TC',serif;
+    font-weight:700;
+    font-size:26px;
+    color:var(--gold);
+  }
+
+  details.card{padding:0;overflow:hidden;}
+  details.card summary{
+    list-style:none;
+    cursor:pointer;
+    padding:16px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-family:'Noto Serif TC',serif;
+    font-weight:700;
+    font-size:15px;
+    color:var(--pine);
+  }
+  details.card summary::-webkit-details-marker{display:none;}
+  details.card summary::before{
+    content:"ℹ";
+    font-size:11px;
+    background:var(--gold);
+    color:#fff;
+    width:20px;height:20px;
+    border-radius:50%;
+    display:inline-flex;
+    align-items:center;justify-content:center;
+    font-family:'Noto Sans TC',sans-serif;
+    flex:none;
+  }
+  details.card summary::after{
+    content:"展開";
+    margin-left:auto;
+    font-size:12px;
+    font-weight:500;
+    color:var(--muted);
+    font-family:'Noto Sans TC',sans-serif;
+  }
+  details.card[open] summary::after{content:"收合";}
+  .explain-body{
+    padding:0 16px 16px;
+    border-top:1px solid var(--line);
+  }
+  .rule-block{margin-top:14px;}
+  .rule-block:first-child{margin-top:14px;}
+  .rule-block h3{
+    font-size:13px;
+    color:var(--pine);
+    margin:0 0 6px;
+    display:flex;
+    align-items:center;
+    gap:6px;
+  }
+  .rule-block h3::before{
+    content:"";
+    width:8px;height:8px;
+    background:var(--gold);
+    border-radius:50%;
+    flex:none;
+  }
+  .rule-block ul{
+    margin:0;
+    padding-left:18px;
+    font-size:12.5px;
+    color:var(--muted);
+    line-height:1.75;
+  }
+  .rule-block code{
+    background:#EDEBE0;
+    color:var(--pine-2);
+    padding:1px 5px;
+    border-radius:4px;
+    font-size:12px;
+  }
+  footer{
+    max-width:640px;
+    margin:0 auto;
+    padding:0 16px;
+    font-size:11.5px;
+    color:var(--muted);
+    line-height:1.7;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">環保局清潔隊</div>
+  <h1>加班費試算系統</h1>
+  <div class="sub">依勞基法第24條、第39條、第40條計算方式，比照勞動部月薪制加班費試算系統邏輯編製。</div>
+</header>
+
+<main>
+
+  <details class="card">
+    <summary>加班費計算方式說明</summary>
+    <div class="explain-body">
+      <div class="rule-block">
+        <h3>平日每小時工資額</h3>
+        <ul><li><code>月工資總額 ÷ 30 ÷ 8</code>，即月薪相當於240小時所換算的時薪。</li></ul>
+      </div>
+      <div class="rule-block">
+        <h3>平日加班（勞基法第24條第1項）</h3>
+        <ul>
+          <li>延長工時前2小時：時薪 <code>×4/3（1.33倍）</code></li>
+          <li>再延長2小時（第3~4小時）：時薪 <code>×5/3（1.66倍）</code></li>
+          <li>正常＋加班每日上限12小時（天災事變除外）</li>
+        </ul>
+      </div>
+      <div class="rule-block">
+        <h3>休息日出勤（勞基法第24條第2項）</h3>
+        <ul>
+          <li>0~2小時：時薪 <code>×4/3（1.33倍）</code></li>
+          <li>2~8小時：時薪 <code>×5/3（1.66倍）</code></li>
+          <li>8~12小時：除加班費外需另補本薪，共計時薪 <code>×8/3（2.66倍）</code></li>
+          <li>採「核實計算」，做多久算多久，不再以4／8／12小時整段起算</li>
+        </ul>
+      </div>
+      <div class="rule-block">
+        <h3>國定假日／特別休假出勤（勞基法第39條）</h3>
+        <ul>
+          <li>不論工時多寡先加發1日工資：時薪 <code>×8</code></li>
+          <li>超過8小時，第9~10小時：時薪 <code>×4/3（1.33倍）</code>；第11~12小時：時薪 <code>×5/3（1.66倍）</code></li>
+        </ul>
+      </div>
+      <div class="rule-block">
+        <h3>例假日出勤（勞基法第40條）</h3>
+        <ul>
+          <li>僅限天災、事變或突發事件，出勤不論工時多寡先加發1日工資：時薪 <code>×8</code></li>
+          <li>超過8小時，第9~10小時：時薪 <code>×4/3（1.33倍）</code>；第11~12小時：時薪 <code>×5/3（1.66倍）</code></li>
+          <li>非因上述事由出勤，屬違法且應給予事後補假</li>
+        </ul>
+      </div>
+      <div class="rule-block">
+        <h3>天災、事變或突發事件加班（勞基法第32條第4項）</h3>
+        <ul><li>不受時數限制，一律時薪 <code>×2</code></li></ul>
+      </div>
+      <div class="rule-block">
+        <h3>夜點費</h3>
+        <ul><li>非勞基法加班費項目，依各機關夜點費支給規定按次核發，此處以「次數 × 金額」試算。</li></ul>
+      </div>
+    </div>
+  </details>
+
+  <div class="card">
+    <h2><span class="n">1</span>月工資總額</h2>
+    <p class="hint">請填入完整月薪（本薪＋固定津貼＋全勤獎金等經常性給與，不含加班費本身）。系統將自動換算平日每小時工資額（月薪 ÷ 30 ÷ 8）。</p>
+    <div class="salary-row">
+      <label for="salary">月工資總額（元）</label>
+      <input type="number" id="salary" min="0" step="1" value="36840" oninput="updateWage()" autocomplete="off" inputmode="decimal">
+    </div>
+    <div class="wage-out">平日每小時工資額：<b id="hourlyWage">150</b> 元</div>
+  </div>
+
+  <div class="card">
+    <h2><span class="n">2</span>當月加班時數彙總</h2>
+    <p class="hint">正常工時以每日8小時計算。各類別只需填入「每次（每日）時數」與「次數」，系統會自動判斷級距（如平日前2小時、後2小時）並計算，不需自行拆分。若同一類別當月有不同時數的出勤情形，請分別試算後將各次金額加總。</p>
+
+    <div class="section-title">平日加班</div>
+    <div class="grid2">
+      <label for="wd-hrs">每日加班時數（小時）</label>
+      <label for="wd-days">加班天數（天）</label>
+      <input type="number" id="wd-hrs" min="0" max="4" step="0.5" value="4" autocomplete="off" inputmode="decimal">
+      <select id="wd-days" class="count-select" data-max="31"></select>
+    </div>
+
+    <div class="section-title">休息日出勤</div>
+    <div class="grid2">
+      <label for="rd-hrs">每次出勤時數（小時）</label>
+      <label for="rd-days">出勤次數（次）</label>
+      <input type="number" id="rd-hrs" min="0" max="12" step="0.5" value="0" autocomplete="off" inputmode="decimal">
+      <select id="rd-days" class="count-select" data-max="31"></select>
+    </div>
+
+    <div class="section-title">國定假日／特別休假出勤</div>
+    <div class="grid2">
+      <label for="hol-hrs">每次出勤時數（小時）</label>
+      <label for="hol-days">出勤次數（天）</label>
+      <input type="number" id="hol-hrs" min="0" max="12" step="0.5" value="0" autocomplete="off" inputmode="decimal">
+      <select id="hol-days" class="count-select" data-max="31"></select>
+    </div>
+    <p class="formula" style="margin-top:6px;">出勤時數請含正常8小時計算，例如出勤10小時請填10。</p>
+
+    <div class="section-title">例假日出勤（須因天災、事變或突發事件）</div>
+    <div class="grid2">
+      <label for="off-hrs">每次出勤時數（小時）</label>
+      <label for="off-days">出勤次數（天）</label>
+      <input type="number" id="off-hrs" min="0" max="12" step="0.5" value="0" autocomplete="off" inputmode="decimal">
+      <select id="off-days" class="count-select" data-max="31"></select>
+    </div>
+    <p class="formula" style="margin-top:6px;">出勤時數請含正常8小時計算，例如出勤10小時請填10。</p>
+    <label style="margin-top:10px;display:flex;align-items:flex-start;gap:8px;font-weight:400;font-size:13px;">
+      <input type="checkbox" id="off-disaster" style="width:17px;height:17px;flex:none;margin-top:2px;accent-color:var(--pine);">
+      以上出勤均為天災、事變或突發事件所致
+    </label>
+
+    <div class="section-title">天災、事變或突發事件加班</div>
+    <p class="hint" style="margin-top:-6px;">依勞基法第32條第4項，不受時數限制，一律按平日每小時工資額加倍發給（不含上方例假日／國定假日已列入之時數）。</p>
+    <div>
+      <label>合計時數</label>
+      <input type="number" id="dis-total" min="0" step="0.5" value="0" autocomplete="off" inputmode="decimal">
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><span class="n">3</span>夜點費</h2>
+    <p class="hint">清潔隊夜間出勤（如凌晨收運、夜間巡查）夜點費多依各機關「加班值宿夜點費支給規定」按次核發，非依比例時數計算。請填入出勤次數與每次核發金額。</p>
+    <div class="grid2">
+      <label for="nightCount">夜點出勤次數</label>
+      <label for="nightRate">每次金額（元）</label>
+      <select id="nightCount" class="count-select" data-max="31"></select>
+      <input type="number" id="nightRate" min="0" step="1" value="130" autocomplete="off" inputmode="decimal">
+    </div>
+  </div>
+
+  <button class="calc" onclick="calculate()">開始試算</button>
+  <button class="reset" onclick="resetForm()">重製所有欄位</button>
+
+  <div class="card result-card" id="resultCard" style="display:none;">
+    <h2><span class="n">✓</span>試算結果</h2>
+
+    <div class="result-item">
+      <div class="result-line"><span class="label">平日加班費</span><span class="amt" id="r-weekday">0 元</span></div>
+      <p class="formula" id="f-weekday"></p>
+    </div>
+    <div class="result-item">
+      <div class="result-line"><span class="label">休息日出勤費</span><span class="amt" id="r-restday">0 元</span></div>
+      <p class="formula" id="f-restday"></p>
+    </div>
+    <div class="result-item">
+      <div class="result-line"><span class="label">國定假日／特休出勤費</span><span class="amt" id="r-holiday">0 元</span></div>
+      <p class="formula" id="f-holiday"></p>
+    </div>
+    <div class="result-item">
+      <div class="result-line"><span class="label">例假日出勤費</span><span class="amt" id="r-off">0 元</span></div>
+      <p class="formula" id="f-off"></p>
+    </div>
+    <div class="result-item">
+      <div class="result-line"><span class="label">天災事變加班費</span><span class="amt" id="r-disaster">0 元</span></div>
+      <p class="formula" id="f-disaster"></p>
+    </div>
+    <div class="result-item">
+      <div class="result-line"><span class="label">夜點費</span><span class="amt" id="r-night">0 元</span></div>
+      <p class="formula" id="f-night"></p>
+    </div>
+
+    <div id="warnBox"></div>
+    <div class="result-total"><span class="label">加給工資總額</span><span class="amt" id="r-total">0 元</span></div>
+  </div>
+
+</main>
+
+<footer>
+  本工具依現行勞動基準法第24條、第39條、第40條規定編製，僅供試算參考。
+</footer>
+
+<script>
+function updateWage(){
+  const salary = parseFloat(document.getElementById('salary').value) || 0;
+  const wage = salary / 30 / 8;
+  document.getElementById('hourlyWage').textContent = wage.toFixed(2).replace(/\.00$/,'');
+  return wage;
+}
+
+function val(id){
+  return parseFloat(document.getElementById(id).value) || 0;
+}
+
+// 平日加班：單次時數自動拆「前2小時x4/3」「第3~4小時x5/3」，再乘天數
+function weekdayPay(hrsPerDay, wage){
+  const b1 = Math.min(hrsPerDay, 2);
+  const b2 = Math.min(Math.max(hrsPerDay-2,0), 2);
+  return wage*(4/3)*b1 + wage*(5/3)*b2;
+}
+
+// 休息日出勤：單次時數自動拆「0~2hr x4/3」「2~8hr x5/3」「8~12hr x8/3」，再乘次數
+function restdayPay(hrsPerTime, wage){
+  const b1 = Math.min(hrsPerTime, 2);
+  const b2 = Math.min(Math.max(hrsPerTime-2,0), 6);
+  const b3 = Math.min(Math.max(hrsPerTime-8,0), 4);
+  return wage*(4/3)*b1 + wage*(5/3)*b2 + wage*(8/3)*b3;
+}
+
+// 例假日／國定假日：不論工時多寡先給1日工資(8hr)，超過8hr部分 9~10hr x4/3、11~12hr x5/3
+function fullDayPay(hrsPerTime, wage){
+  if(hrsPerTime<=0) return 0;
+  const base = wage*8;
+  const b1 = Math.min(Math.max(hrsPerTime-8,0), 2); // 9~10hr
+  const b2 = Math.min(Math.max(hrsPerTime-10,0), 2); // 11~12hr
+  return base + wage*(4/3)*b1 + wage*(5/3)*b2;
+}
+
+function fmt(n){
+  const r = Math.round(n*100)/100;
+  return r.toString();
+}
+
+function calculate(){
+  const wage = updateWage();
+
+  // 平日加班
+  const wdHrs = val('wd-hrs'), wdDays = val('wd-days');
+  const wdB1 = Math.min(wdHrs,2), wdB2 = Math.min(Math.max(wdHrs-2,0),2);
+  const wdPay = weekdayPay(wdHrs, wage) * wdDays;
+  const wdTerms = [];
+  if(wdB1>0) wdTerms.push(`${fmt(wage)}×4/3×${fmt(wdB1)}`);
+  if(wdB2>0) wdTerms.push(`${fmt(wage)}×5/3×${fmt(wdB2)}`);
+  const wdFormula = wdTerms.length ? `(${wdTerms.join(' + ')}) × ${fmt(wdDays)}天 = ${Math.round(wdPay)}元` : '';
+
+  // 休息日出勤
+  const rdHrs = val('rd-hrs'), rdDays = val('rd-days');
+  const rdB1 = Math.min(rdHrs,2), rdB2 = Math.min(Math.max(rdHrs-2,0),6), rdB3 = Math.min(Math.max(rdHrs-8,0),4);
+  const rdPay = restdayPay(rdHrs, wage) * rdDays;
+  const rdTerms = [];
+  if(rdB1>0) rdTerms.push(`${fmt(wage)}×4/3×${fmt(rdB1)}`);
+  if(rdB2>0) rdTerms.push(`${fmt(wage)}×5/3×${fmt(rdB2)}`);
+  if(rdB3>0) rdTerms.push(`${fmt(wage)}×8/3×${fmt(rdB3)}`);
+  const rdFormula = rdTerms.length ? `(${rdTerms.join(' + ')}) × ${fmt(rdDays)}次 = ${Math.round(rdPay)}元` : '';
+
+  // 例假日出勤
+  const offHrs = val('off-hrs'), offDays = val('off-days');
+  const offB1 = Math.min(Math.max(offHrs-8,0),2), offB2 = Math.min(Math.max(offHrs-10,0),2);
+  const offPay = fullDayPay(offHrs, wage) * offDays;
+  const offDisaster = document.getElementById('off-disaster').checked;
+  const offTerms = [];
+  if(offHrs>0) offTerms.push(`${fmt(wage)}×8`);
+  if(offB1>0) offTerms.push(`${fmt(wage)}×4/3×${fmt(offB1)}`);
+  if(offB2>0) offTerms.push(`${fmt(wage)}×5/3×${fmt(offB2)}`);
+  const offFormula = offTerms.length ? `(${offTerms.join(' + ')}) × ${fmt(offDays)}天 = ${Math.round(offPay)}元` : '';
+
+  // 國定假日／特休出勤
+  const holHrs = val('hol-hrs'), holDays = val('hol-days');
+  const holB1 = Math.min(Math.max(holHrs-8,0),2), holB2 = Math.min(Math.max(holHrs-10,0),2);
+  const holPay = fullDayPay(holHrs, wage) * holDays;
+  const holTerms = [];
+  if(holHrs>0) holTerms.push(`${fmt(wage)}×8`);
+  if(holB1>0) holTerms.push(`${fmt(wage)}×4/3×${fmt(holB1)}`);
+  if(holB2>0) holTerms.push(`${fmt(wage)}×5/3×${fmt(holB2)}`);
+  const holFormula = holTerms.length ? `(${holTerms.join(' + ')}) × ${fmt(holDays)}天 = ${Math.round(holPay)}元` : '';
+
+  // 天災事變加班
+  const disHrs = val('dis-total');
+  const disPay = wage*2*disHrs;
+  const disFormula = disHrs>0 ? `${fmt(wage)}×2×${fmt(disHrs)}小時 = ${Math.round(disPay)}元` : '';
+
+  // 夜點費
+  const nightCount = val('nightCount'), nightRate = val('nightRate');
+  const nightPay = nightCount*nightRate;
+  const nightFormula = (nightCount>0) ? `${fmt(nightRate)}元 × ${fmt(nightCount)}次 = ${Math.round(nightPay)}元` : '';
+
+  const grandTotal = wdPay+rdPay+offPay+holPay+disPay+nightPay;
+
+  document.getElementById('r-weekday').textContent = Math.round(wdPay)+' 元';
+  document.getElementById('r-restday').textContent = Math.round(rdPay)+' 元';
+  document.getElementById('r-off').textContent = Math.round(offPay)+' 元';
+  document.getElementById('r-holiday').textContent = Math.round(holPay)+' 元';
+  document.getElementById('r-disaster').textContent = Math.round(disPay)+' 元';
+  document.getElementById('r-night').textContent = Math.round(nightPay)+' 元';
+  document.getElementById('r-total').textContent = Math.round(grandTotal)+' 元';
+
+  document.getElementById('f-weekday').textContent = wdFormula;
+  document.getElementById('f-restday').textContent = rdFormula;
+  document.getElementById('f-off').textContent = offFormula;
+  document.getElementById('f-holiday').textContent = holFormula;
+  document.getElementById('f-disaster').textContent = disFormula;
+  document.getElementById('f-night').textContent = nightFormula;
+
+  const warnBox = document.getElementById('warnBox');
+  warnBox.innerHTML = (offDays>0 && !offDisaster)
+    ? `<div class="warn">⚠ 非因天災、事變或突發事件，雇主不得使勞工於例假日出勤，屬違法事項，另應依勞基法處新臺幣2萬元以上100萬元以下罰鍰，並應給予勞工事後補假休息。</div>`
+    : '';
+
+  document.getElementById('resultCard').style.display = 'block';
+  document.getElementById('resultCard').scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+function populateCountSelects(){
+  document.querySelectorAll('select.count-select').forEach(sel=>{
+    const max = parseInt(sel.dataset.max) || 31;
+    let opts = '';
+    for(let i=0;i<=max;i++){
+      opts += `<option value="${i}">${i}</option>`;
+    }
+    sel.innerHTML = opts;
+  });
+}
+
+function resetForm(){
+  document.getElementById('salary').value = 36840;
+  document.getElementById('wd-hrs').value = 4;
+  document.getElementById('wd-days').value = 0;
+  document.getElementById('rd-hrs').value = 0;
+  document.getElementById('rd-days').value = 0;
+  document.getElementById('off-hrs').value = 0;
+  document.getElementById('off-days').value = 0;
+  document.getElementById('off-disaster').checked = false;
+  document.getElementById('hol-hrs').value = 0;
+  document.getElementById('hol-days').value = 0;
+  document.getElementById('dis-total').value = 0;
+  document.getElementById('nightCount').value = 0;
+  document.getElementById('nightRate').value = 130;
+
+  document.getElementById('resultCard').style.display = 'none';
+  document.getElementById('warnBox').innerHTML = '';
+  updateWage();
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+function randomizeFieldNames(){
+  const rand = () => Math.random().toString(36).slice(2,10);
+  document.querySelectorAll('input, select').forEach(el=>{
+    el.setAttribute('name', 'f_' + rand());
+    el.setAttribute('autocomplete', 'off');
+  });
+}
+
+function enableAutoSelect(){
+  document.querySelectorAll('input[type=number]').forEach(el=>{
+    el.addEventListener('focus', function(){
+      if(this.value === '0'){
+        this.value = '';
+      }
+    });
+    el.addEventListener('blur', function(){
+      if(this.value === ''){
+        this.value = '0';
+        if(this.id === 'salary') updateWage();
+      }
+    });
+  });
+}
+
+populateCountSelects();
+randomizeFieldNames();
+enableAutoSelect();
+updateWage();
+</script>
+
+</body>
+</html>
