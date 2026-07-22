@@ -214,9 +214,15 @@ function matchesSearch(...parts){
 async function loadState(){
   state = defaultState();
   try{
-    const res = await window.storage.get(STORAGE_KEY, false);
-    if(res && res.value){
-      const parsed = JSON.parse(res.value);
+    let raw = null;
+    if(window.storage && typeof window.storage.get === 'function'){
+      const res = await window.storage.get(STORAGE_KEY, false);
+      raw = res && res.value;
+    } else {
+      raw = localStorage.getItem(STORAGE_KEY);
+    }
+    if(raw){
+      const parsed = JSON.parse(raw);
       state.records = Object.assign(state.records, parsed.records||{});
       state.compRecords = parsed.compRecords || [];
       if(parsed.quotaByYear){
@@ -235,8 +241,14 @@ async function loadState(){
 }
 
 async function saveState(){
-  try{ await window.storage.set(STORAGE_KEY, JSON.stringify(state), false); }
-  catch(e){ console.error('儲存失敗', e); }
+  try{
+    const json = JSON.stringify(state);
+    if(window.storage && typeof window.storage.set === 'function'){
+      await window.storage.set(STORAGE_KEY, json, false);
+    } else {
+      localStorage.setItem(STORAGE_KEY, json);
+    }
+  }catch(e){ console.error('儲存失敗', e); }
 }
 
 function getQuota(key, year){
