@@ -91,7 +91,8 @@
   button.ghost{background:transparent;color:var(--ink-soft);border:1px solid var(--line);font-weight:500;}
 
   .total-row{display:flex;gap:8px;align-items:flex-end;margin-bottom:16px;padding-bottom:14px;border-bottom:1px dashed var(--line);flex-wrap:wrap;}
-  .total-row .hint{font-size:11px;color:var(--ink-soft);flex-basis:100%;margin-top:-8px;}
+  .hint{font-size:11px;color:var(--ink-soft);}
+  .total-row .hint{flex-basis:100%;margin-top:-8px;}
 
   ul.ledger{list-style:none;margin:0;padding:0;}
   ul.ledger li{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px dotted var(--line);font-size:14px;flex-wrap:wrap;}
@@ -160,6 +161,7 @@ const LEAVE_TYPES = [
 const NOW = new Date();
 const TODAY = NOW.getFullYear()+'-'+String(NOW.getMonth()+1).padStart(2,'0')+'-'+String(NOW.getDate()).padStart(2,'0');
 const CUR_YEAR = NOW.getFullYear();
+const HOURS_PER_DAY = 8;
 
 let state = { quotaByYear:{}, records:{}, compRecords:[] };
 let lastAddedId = null;
@@ -172,10 +174,26 @@ let calendarMode = false;
 let calYear = CUR_YEAR;
 let calMonth = NOW.getMonth()+1;
 let chartMode = false;
+let expiryTouched = false;
+let aiPendingItems = [];
+
+function onCompDateChange(){
+  if(expiryTouched) return;
+  const dateVal = document.getElementById('compDate').value;
+  const expiryEl = document.getElementById('compExpiry');
+  if(dateVal && expiryEl) expiryEl.value = addYears(dateVal, 2);
+}
 
 function yearMin(y){ return y+'-01-01'; }
 function yearMax(y){ return y+'-12-31'; }
 function defaultDateFor(y){ return y===CUR_YEAR ? TODAY : y+'-01-01'; }
+function addYears(dateStr, n){
+  try{
+    const d = new Date(dateStr+'T00:00:00');
+    d.setFullYear(d.getFullYear()+n);
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  }catch(e){ return ''; }
+}
 
 function defaultState(){
   const records={};
@@ -234,14 +252,24 @@ function setQuota(key, year, val){
 }
 function usedOf(key, year){
   year = year || selectedYear;
-  return (state.records[key]||[]).filter(r=>r.date.startsWith(String(year))).reduce((s,r)=>s+Number(r.days),0);
+  return (state.records[key]||[]).filter(r=>r.date.startsWith(String(year))).reduce((s,r)=>s+toDays(r),0);
 }
 function remainOf(key, year){
   year = year || selectedYear;
   return getQuota(key,year) - usedOf(key,year);
 }
+function toDays(r){
+  if(r.unit==='hour') return Number(r.amount)/HOURS_PER_DAY;
+  if(r.unit==='day') return Number(r.amount);
+  return Number(r.days)||0;
+}
+function displayAmount(r){
+  if(r.unit==='hour') return `${fmt(r.amount)} 小時`;
+  const amt = r.unit==='day' ? r.amount : r.days;
+  return `${fmt(amt)} 天`;
+}
 function compBalanceUpTo(year){
-  return state.compRecords.filter(r=> parseInt(r.date.slice(0,4),10) <= year).reduce((s,r)=> s + (r.type==='earn'? Number(r.days): -Number(r.days)),0);
+  return state.compRecords.filter(r=> parseInt(r.date.slice(0,4),10) <= year).reduce((s,r)=> s + (r.type==='earn'? toDays(r): -toDays(r)),0);
 }
 
 function stampCard(t){
@@ -260,13 +288,13 @@ function dashboardPanel(){
   let monthTotal = 0, yearTotal = 0;
   LEAVE_TYPES.forEach(t=>{
     (state.records[t.key]||[]).forEach(r=>{
-      if(r.date.startsWith(String(y))) yearTotal += Number(r.days);
-      if(r.date.startsWith(ym)) monthTotal += Number(r.days);
+      if(r.date.startsWith(String(y))) yearTotal += toDays(r);
+      if(r.date.startsWith(ym)) monthTotal += toDays(r);
     });
   });
   state.compRecords.filter(r=>r.type==='use').forEach(r=>{
-    if(r.date.startsWith(String(y))) yearTotal += Number(r.days);
-    if(r.date.startsWith(ym)) monthTotal += Number(r.days);
+    if(r.date.startsWith(String(y))) yearTotal += toDays(r);
+    if(r.date.startsWith(ym)) monthTotal += toDays(r);
   });
   const totalRemain = LEAVE_TYPES.reduce((s,t)=> s + remainOf(t.key, CUR_YEAR), 0);
   return `
@@ -274,6 +302,39 @@ function dashboardPanel(){
       <div class="dash-card"><div class="label">本月已請假</div><div class="num">${fmt(monthTotal)}天</div></div>
       <div class="dash-card"><div class="label">今年已請假</div><div class="num">${fmt(yearTotal)}天</div></div>
       <div class="dash-card"><div class="label">假別剩餘合計</div><div class="num">${fmt(totalRemain)}天</div></div>
+    </div>`;
+}
+
+function aiPanel(){
+  const previewHtml = aiPendingItems.length? `
+    <div style="margin-top:12px;">
+      <div style="font-size:12.5px;color:var(--ink-soft);margin-bottom:8px;">AI 辨識出以下 ${aiPendingItems.length} 筆，確認後才會登記：</div>
+      <ul class="ledger">
+        ${aiPendingItems.map((it,idx)=>{
+          const label = it.key==='comp' ? `補休（${it.compType==='use'?'使用':'獲得'}）` : ((LEAVE_TYPES.find(t=>t.key===it.key)||{}).label || it.key);
+          return `<li>
+            <span class="d">${escapeHtml(it.date||'')}</span>
+            <span class="tag" style="background:var(--paper-deep);color:var(--ink-soft);">${escapeHtml(label)}</span>
+            <span class="days">${fmt(it.amount)} ${it.unit==='hour'?'小時':'天'}</span>
+            <span class="note">${escapeHtml(it.note||'')}</span>
+            <button class="del" title="移除" onclick="removeAiItem(${idx})">✕</button>
+          </li>`;
+        }).join('')}
+      </ul>
+      <div class="row" style="margin-top:10px;">
+        <button class="btn-jade" onclick="applyAiItems()">確認新增全部</button>
+        <button class="ghost" onclick="cancelAiItems()">取消</button>
+      </div>
+    </div>` : '';
+  return `
+    <div class="block">
+      <h2><span class="dot dot-jade"></span>AI 快速登記</h2>
+      <p class="hint" style="margin-bottom:8px;">用一般文字描述想登記的假別，例如「8/5 請特休1天，家裡有事」或「明天請病假半天」，AI 會幫你解析成紀錄，確認後才會真的加入存摺。</p>
+      <textarea id="aiInputText" rows="3" placeholder="例如：明天請病假半天，8月20日獲得補休4小時"></textarea>
+      <div class="row" style="margin-top:8px;">
+        <button class="btn-jade" onclick="aiParseInput()">AI 解析</button>
+      </div>
+      ${previewHtml}
     </div>`;
 }
 
@@ -291,7 +352,7 @@ function reminderBanner(){
   if(list.length===0) return '';
   const items = list.map(r=>{
     const statusTxt = r.diffDays < 0 ? `已過期 ${Math.abs(r.diffDays)} 天` : (r.diffDays===0? '今天到期' : `${r.diffDays} 天後到期`);
-    return `${r.date} 獲得的 ${fmt(r.days)} 天補休，到期日 ${r.expiry}（${statusTxt}）`;
+    return `${r.date} 獲得的 ${displayAmount(r)}補休，到期日 ${r.expiry}（${statusTxt}）`;
   }).join('<br>');
   return `<div class="reminder-bar"><strong>⚠️ 補休到期提醒</strong>${items}</div>`;
 }
@@ -309,7 +370,7 @@ function calendarPanel(){
       if(r.date.startsWith(ymPrefix)){
         const d = parseInt(r.date.slice(8,10),10);
         if(!dayMap[d]) dayMap[d]=[];
-        dayMap[d].push({seal:t.seal, c:t.c, label:`${t.label} ${fmt(r.days)}天${r.note? '：'+r.note:''}`});
+        dayMap[d].push({seal:t.seal, c:t.c, label:`${t.label} ${displayAmount(r)}${r.note? '：'+r.note:''}`});
       }
     });
   });
@@ -317,7 +378,7 @@ function calendarPanel(){
     if(r.date.startsWith(ymPrefix)){
       const d = parseInt(r.date.slice(8,10),10);
       if(!dayMap[d]) dayMap[d]=[];
-      dayMap[d].push({seal:'補', c:'brick', label:`補休${r.type==='earn'?'獲得':'使用'} ${fmt(r.days)}天${r.note? '：'+r.note:''}`});
+      dayMap[d].push({seal:'補', c:'brick', label:`補休${r.type==='earn'?'獲得':'使用'} ${displayAmount(r)}${r.note? '：'+r.note:''}`});
     }
   });
   let cells = '';
@@ -348,13 +409,13 @@ function statsChart(){
     (state.records[t.key]||[]).forEach(r=>{
       if(r.date.startsWith(String(y))){
         const mIdx = parseInt(r.date.slice(5,7),10)-1;
-        monthTotals[mIdx][t.key] = (monthTotals[mIdx][t.key]||0) + Number(r.days);
+        monthTotals[mIdx][t.key] = (monthTotals[mIdx][t.key]||0) + toDays(r);
       }
     });
   });
   state.compRecords.filter(r=>r.type==='use' && r.date.startsWith(String(y))).forEach(r=>{
     const mIdx = parseInt(r.date.slice(5,7),10)-1;
-    monthTotals[mIdx]['comp'] = (monthTotals[mIdx]['comp']||0) + Number(r.days);
+    monthTotals[mIdx]['comp'] = (monthTotals[mIdx]['comp']||0) + toDays(r);
   });
   const maxVal = Math.max(1, ...monthTotals.map(m=> Object.values(m).reduce((s,v)=>s+v,0)));
   const TRACK_H = 130;
@@ -404,13 +465,22 @@ function leaveSection(t){
       <form class="entry" onsubmit="addRecord('${t.key}', event)">
         <div class="field"><label>使用日期</label><input type="date" id="${t.key}Date" value="${dDef}" min="${dMin}" max="${dMax}" required></div>
         <div class="field field-days">
-          <label>天數</label>
+          <label>數量</label>
           <div class="days-row">
-            <input type="number" id="${t.key}Days" min="0.5" step="0.5" value="1" required>
-            <div class="quickdays">
-              <button type="button" onclick="setDays('${t.key}Days',0.5)">0.5</button>
-              <button type="button" onclick="setDays('${t.key}Days',1)">1</button>
-              <button type="button" onclick="setDays('${t.key}Days',2)">2</button>
+            <input type="number" id="${t.key}Amount" min="0.5" step="0.5" value="1" required>
+            <select id="${t.key}Unit" onchange="onUnitChange('${t.key}')" style="width:64px;padding:8px 4px;">
+              <option value="day">天</option>
+              <option value="hour">小時</option>
+            </select>
+            <div class="quickdays" id="${t.key}QuickDay">
+              <button type="button" onclick="setDays('${t.key}Amount',0.5)">0.5</button>
+              <button type="button" onclick="setDays('${t.key}Amount',1)">1</button>
+              <button type="button" onclick="setDays('${t.key}Amount',2)">2</button>
+            </div>
+            <div class="quickdays" id="${t.key}QuickHour" style="display:none;">
+              <button type="button" onclick="setDays('${t.key}Amount',1)">1</button>
+              <button type="button" onclick="setDays('${t.key}Amount',2)">2</button>
+              <button type="button" onclick="setDays('${t.key}Amount',4)">4</button>
             </div>
           </div>
         </div>
@@ -420,9 +490,15 @@ function leaveSection(t){
       <ul class="ledger" id="${t.key}List">
         ${rows.length? rows.map(r=>{
           if(editing && editing.kind==='record' && editing.key===t.key && editing.id===r.id){
+            const eu = r.unit || 'day';
+            const ea = r.unit ? r.amount : r.days;
             return `<li class="editrow">
               <input type="date" id="editDate-${t.key}-${r.id}" value="${r.date}" min="${dMin}" max="${dMax}">
-              <input type="number" id="editDays-${t.key}-${r.id}" value="${r.days}" min="0.5" step="0.5" style="width:74px;">
+              <input type="number" id="editAmount-${t.key}-${r.id}" value="${ea}" min="0.5" step="0.5" style="width:70px;">
+              <select id="editUnit-${t.key}-${r.id}" style="width:64px;">
+                <option value="day" ${eu==='day'?'selected':''}>天</option>
+                <option value="hour" ${eu==='hour'?'selected':''}>小時</option>
+              </select>
               <input type="text" id="editNote-${t.key}-${r.id}" value="${escapeAttr(r.note||'')}" style="flex:1;min-width:100px;">
               <button class="btn-${t.c}" onclick="saveEditRecord('${t.key}','${r.id}')">儲存</button>
               <button class="ghost" onclick="cancelEdit()">取消</button>
@@ -431,7 +507,7 @@ function leaveSection(t){
           return `<li class="${r.id===lastAddedId?'stamp-in':''}">
             <span class="d">${r.date}</span>
             <span class="tag" style="background:var(--${t.c}-soft);color:var(--${t.c});">用</span>
-            <span class="days">${fmt(r.days)}天</span>
+            <span class="days">${displayAmount(r)}</span>
             <span class="note">${r.note? escapeHtml(r.note):''}</span>
             <button class="del" title="編輯" onclick="startEditRecord('${t.key}','${r.id}')">✎</button>
             <button class="del" title="刪除" onclick="removeRecord('${t.key}','${r.id}')">✕</button>
@@ -442,6 +518,7 @@ function leaveSection(t){
 }
 
 function render(){
+  expiryTouched = false;
   const allComp = state.compRecords.filter(r=>r.date.startsWith(String(selectedYear)));
   let compRows = allComp.filter(r=>matchesSearch(r.date, r.note, '補休', r.type==='earn'?'獲得':'使用'));
   compRows.sort((a,b)=> sortAsc ? a.date.localeCompare(b.date) : b.date.localeCompare(a.date));
@@ -464,11 +541,12 @@ function render(){
       <div class="stamp-card ${compBal<0?'warn':''}">
         <div class="seal c-brick">補</div>
         <div class="label">補休結餘</div>
-        <div class="num">${fmt(compBal)}<small>天（至 ${selectedYear} 年底）</small></div>
+        <div class="num">${fmt(compBal)}<small>天 ≈ ${fmt(compBal*HOURS_PER_DAY)} 小時（至 ${selectedYear} 年底）</small></div>
       </div>
     </div>
 
     ${dashboardPanel()}
+    ${aiPanel()}
 
     <div class="toolbar">
       <div class="toolbar-row">
@@ -491,11 +569,12 @@ function render(){
     ${calendarPanel()}
     ${statsChart()}
 
-    <div class="section-label">各假別紀錄</div>
+    <div class="section-label">各假別紀錄（可用「天」或「小時」登記，1 天 = 8 小時）</div>
     ${LEAVE_TYPES.map(leaveSection).join('')}
 
     <section class="block">
       <h2><span class="dot dot-brick"></span>補休</h2>
+      <div class="hint" style="margin-bottom:10px;">可選擇用「天」或「小時」登記，換算比例為 1 天 = 8 小時</div>
       <form class="entry" onsubmit="addComp(event)">
         <div class="field"><label>類型</label>
           <select id="compType">
@@ -503,32 +582,47 @@ function render(){
             <option value="use">使用補休</option>
           </select>
         </div>
-        <div class="field"><label>日期</label><input type="date" id="compDate" value="${dDef}" min="${dMin}" max="${dMax}" required></div>
+        <div class="field"><label>日期</label><input type="date" id="compDate" value="${dDef}" min="${dMin}" max="${dMax}" onchange="onCompDateChange()" required></div>
         <div class="field field-days">
-          <label>天數</label>
+          <label>數量</label>
           <div class="days-row">
-            <input type="number" id="compDays" min="0.5" step="0.5" value="1" required>
-            <div class="quickdays">
-              <button type="button" onclick="setDays('compDays',0.5)">0.5</button>
-              <button type="button" onclick="setDays('compDays',1)">1</button>
-              <button type="button" onclick="setDays('compDays',2)">2</button>
+            <input type="number" id="compAmount" min="0.5" step="0.5" value="1" required>
+            <select id="compUnit" onchange="onCompUnitChange()" style="width:64px;padding:8px 4px;">
+              <option value="day">天</option>
+              <option value="hour">小時</option>
+            </select>
+            <div class="quickdays" id="compQuickDay">
+              <button type="button" onclick="setDays('compAmount',0.5)">0.5</button>
+              <button type="button" onclick="setDays('compAmount',1)">1</button>
+              <button type="button" onclick="setDays('compAmount',2)">2</button>
+            </div>
+            <div class="quickdays" id="compQuickHour" style="display:none;">
+              <button type="button" onclick="setDays('compAmount',1)">1</button>
+              <button type="button" onclick="setDays('compAmount',2)">2</button>
+              <button type="button" onclick="setDays('compAmount',4)">4</button>
             </div>
           </div>
         </div>
-        <div class="field" style="min-width:150px;"><label>到期日（選填）</label><input type="date" id="compExpiry"></div>
+        <div class="field" style="min-width:150px;"><label>到期日（選填）</label><input type="date" id="compExpiry" value="${addYears(dDef,2)}" oninput="expiryTouched=true"></div>
         <div class="field note"><label>備註</label><input type="text" id="compNote" placeholder="例如：假日加班換休"></div>
         <button type="submit" class="btn-brick">登記</button>
       </form>
       <ul class="ledger" id="compList">
         ${compRows.length? compRows.map(r=>{
           if(editing && editing.kind==='comp' && editing.id===r.id){
+            const eu = r.unit || 'day';
+            const ea = r.unit ? r.amount : r.days;
             return `<li class="editrow">
               <select id="editCompType-${r.id}">
                 <option value="earn" ${r.type==='earn'?'selected':''}>獲得補休</option>
                 <option value="use" ${r.type==='use'?'selected':''}>使用補休</option>
               </select>
               <input type="date" id="editCompDate-${r.id}" value="${r.date}" min="${dMin}" max="${dMax}">
-              <input type="number" id="editCompDays-${r.id}" value="${r.days}" min="0.5" step="0.5" style="width:74px;">
+              <input type="number" id="editCompAmount-${r.id}" value="${ea}" min="0.5" step="0.5" style="width:70px;">
+              <select id="editCompUnit-${r.id}" style="width:64px;">
+                <option value="day" ${eu==='day'?'selected':''}>天</option>
+                <option value="hour" ${eu==='hour'?'selected':''}>小時</option>
+              </select>
               <input type="text" id="editCompNote-${r.id}" value="${escapeAttr(r.note||'')}" style="flex:1;min-width:100px;">
               <button class="btn-brick" onclick="saveEditComp('${r.id}')">儲存</button>
               <button class="ghost" onclick="cancelEdit()">取消</button>
@@ -537,7 +631,7 @@ function render(){
           return `<li class="${r.id===lastAddedId?'stamp-in':''}">
             <span class="d">${r.date}</span>
             <span class="tag" style="background:var(--brick-soft);color:var(--brick);">${r.type==='earn'?'獲得':'使用'}</span>
-            <span class="days">${r.type==='earn'?'+':'-'}${fmt(r.days)}天</span>
+            <span class="days">${r.type==='earn'?'+':'-'}${displayAmount(r)}</span>
             <span class="note">${r.note? escapeHtml(r.note):''}</span>
             ${r.expiry? `<span class="expiry">到期 ${r.expiry}</span>`:''}
             <button class="del" title="編輯" onclick="startEditComp('${r.id}')">✎</button>
@@ -630,21 +724,31 @@ async function updateQuota(key){
   }
 }
 
+function onUnitChange(key){
+  const unit = document.getElementById(key+'Unit').value;
+  const dayQ = document.getElementById(key+'QuickDay');
+  const hourQ = document.getElementById(key+'QuickHour');
+  if(unit==='hour'){ dayQ.style.display='none'; hourQ.style.display='flex'; }
+  else { dayQ.style.display='flex'; hourQ.style.display='none'; }
+}
+
 async function addRecord(key, e){
   e.preventDefault();
   try{
     const date = document.getElementById(key+'Date').value;
-    const days = parseFloat(document.getElementById(key+'Days').value);
+    const unit = document.getElementById(key+'Unit').value;
+    const amount = parseFloat(document.getElementById(key+'Amount').value);
     const note = document.getElementById(key+'Note').value.trim();
-    if(!date || isNaN(days) || days<=0){ setStatus('請填寫日期與天數', false); return; }
+    if(!date || isNaN(amount) || amount<=0){ setStatus('請填寫日期與數量', false); return; }
+    const daysEquiv = unit==='hour' ? amount/HOURS_PER_DAY : amount;
     const currentRemain = remainOf(key, selectedYear);
-    if(currentRemain - days < 0){
+    if(currentRemain - daysEquiv < 0){
       const label = (LEAVE_TYPES.find(t=>t.key===key)||{}).label || '';
-      if(!window.confirm(`這筆會超過可用的${label}天數（目前剩餘 ${fmt(currentRemain)} 天），仍要登記嗎？`)) return;
+      if(!window.confirm(`這筆會超過可用的${label}天數（目前剩餘 ${fmt(currentRemain)} 天 ≈ ${fmt(currentRemain*HOURS_PER_DAY)} 小時），仍要登記嗎？`)) return;
     }
     const id = uid();
     if(!state.records[key]) state.records[key]=[];
-    state.records[key].push({ id, date, days, note });
+    state.records[key].push({ id, date, unit, amount, note });
     lastAddedId = id;
     await saveState();
     render();
@@ -661,12 +765,17 @@ function cancelEdit(){ editing = null; render(); }
 async function saveEditRecord(key,id){
   try{
     const date = document.getElementById(`editDate-${key}-${id}`).value;
-    const days = parseFloat(document.getElementById(`editDays-${key}-${id}`).value);
+    const amount = parseFloat(document.getElementById(`editAmount-${key}-${id}`).value);
+    const unit = document.getElementById(`editUnit-${key}-${id}`).value;
     const note = document.getElementById(`editNote-${key}-${id}`).value.trim();
-    if(!date || isNaN(days) || days<=0){ setStatus('請填寫正確的日期與天數', false); return; }
+    if(!date || isNaN(amount) || amount<=0){ setStatus('請填寫正確的日期與數量', false); return; }
     const arr = state.records[key] || [];
     const idx = arr.findIndex(r=>r.id===id);
-    if(idx>-1){ arr[idx] = Object.assign({}, arr[idx], {date, days, note}); }
+    if(idx>-1){
+      const updated = Object.assign({}, arr[idx], {date, unit, amount, note});
+      delete updated.days;
+      arr[idx] = updated;
+    }
     editing = null;
     await saveState();
     render();
@@ -714,23 +823,101 @@ async function undoDelete(){
   render();
 }
 
+function onCompUnitChange(){
+  const unit = document.getElementById('compUnit').value;
+  const dayQ = document.getElementById('compQuickDay');
+  const hourQ = document.getElementById('compQuickHour');
+  if(unit==='hour'){ dayQ.style.display='none'; hourQ.style.display='flex'; }
+  else { dayQ.style.display='flex'; hourQ.style.display='none'; }
+}
+
+function removeAiItem(idx){ aiPendingItems.splice(idx,1); render(); }
+function cancelAiItems(){ aiPendingItems = []; render(); }
+
+async function aiParseInput(){
+  const text = document.getElementById('aiInputText').value.trim();
+  if(!text){ setStatus('請先輸入想登記的內容', false); return; }
+  setStatus('AI 解析中…', true);
+  try{
+    const typeList = LEAVE_TYPES.map(t=>`${t.key}(${t.label})`).join('、');
+    const prompt = `今天日期是 ${TODAY}（西元年）。假別代碼有：${typeList}、comp(補休)。
+請把下面這段文字解析成 JSON 陣列，每個元素代表一筆要登記的假別紀錄，格式為：
+{"key":"假別代碼","date":"YYYY-MM-DD","unit":"day或hour","amount":數字,"note":"備註字串(可為空字串)","compType":"earn或use(只有key是comp時才需要，預設earn)"}
+如果文字提到相對日期（例如明天、後天、下週一），請根據今天日期換算成正確的 YYYY-MM-DD。
+只能輸出 JSON 陣列本身，不要有任何其他文字說明，不要用 markdown code block 包起來。
+要解析的文字內容：「${text}」`;
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-6",
+        max_tokens: 1000,
+        messages: [{ role: "user", content: prompt }]
+      })
+    });
+    const data = await res.json();
+    const textOut = (data.content||[]).filter(c=>c.type==='text').map(c=>c.text).join('\n').trim();
+    const cleaned = textOut.replace(/```json|```/g,'').trim();
+    const parsed = JSON.parse(cleaned);
+    if(!Array.isArray(parsed)){ throw new Error('AI 回傳格式不是陣列'); }
+    const validKeys = LEAVE_TYPES.map(t=>t.key).concat(['comp']);
+    const cleanedItems = parsed.filter(it=> it && validKeys.includes(it.key) && /^\d{4}-\d{2}-\d{2}$/.test(it.date) && typeof it.amount==='number' && it.amount>0);
+    cleanedItems.forEach(it=>{
+      if(it.unit!=='hour') it.unit='day';
+      if(it.key==='comp' && it.compType!=='use') it.compType='earn';
+      if(typeof it.note!=='string') it.note='';
+    });
+    if(cleanedItems.length===0){ throw new Error('AI 沒有辨識出可登記的資料，可以試著把日期或天數講清楚一點'); }
+    aiPendingItems = cleanedItems;
+    render();
+    setStatus('AI 解析完成，請確認後新增', true);
+  }catch(err){
+    setStatus('AI 解析失敗：' + (err && err.message ? err.message : String(err)), false);
+    console.error(err);
+  }
+}
+
+async function applyAiItems(){
+  try{
+    aiPendingItems.forEach(item=>{
+      const id = uid();
+      if(item.key==='comp'){
+        const rec = { id, type: item.compType==='use'?'use':'earn', date:item.date, unit:item.unit, amount:Number(item.amount), note:item.note||'' };
+        if(rec.type==='earn'){ rec.expiry = addYears(item.date, 2); }
+        state.compRecords.push(rec);
+      } else {
+        if(!state.records[item.key]) state.records[item.key]=[];
+        state.records[item.key].push({ id, date:item.date, unit:item.unit, amount:Number(item.amount), note:item.note||'' });
+      }
+    });
+    aiPendingItems = [];
+    await saveState();
+    render();
+    setStatus('已新增 AI 解析的紀錄', true);
+  }catch(err){
+    setStatus('新增失敗：' + (err && err.message ? err.message : String(err)), false);
+  }
+}
+
 async function addComp(e){
   e.preventDefault();
   try{
     const type = document.getElementById('compType').value;
     const date = document.getElementById('compDate').value;
-    const days = parseFloat(document.getElementById('compDays').value);
+    const unit = document.getElementById('compUnit').value;
+    const amount = parseFloat(document.getElementById('compAmount').value);
     const expiry = document.getElementById('compExpiry').value || null;
     const note = document.getElementById('compNote').value.trim();
-    if(!date || isNaN(days) || days<=0){ setStatus('請填寫日期與天數', false); return; }
+    if(!date || isNaN(amount) || amount<=0){ setStatus('請填寫日期與數量', false); return; }
+    const daysEquiv = unit==='hour' ? amount/HOURS_PER_DAY : amount;
     if(type==='use'){
       const currentBal = compBalanceUpTo(selectedYear);
-      if(currentBal - days < 0){
-        if(!window.confirm(`這筆會超過可用的補休天數（目前結餘 ${fmt(currentBal)} 天），仍要登記嗎？`)) return;
+      if(currentBal - daysEquiv < 0){
+        if(!window.confirm(`這筆會超過可用的補休（目前結餘 ${fmt(currentBal)} 天 ≈ ${fmt(currentBal*HOURS_PER_DAY)} 小時），仍要登記嗎？`)) return;
       }
     }
     const id = uid();
-    const record = { id, type, date, days, note };
+    const record = { id, type, date, unit, amount, note };
     if(type==='earn' && expiry) record.expiry = expiry;
     state.compRecords.push(record);
     lastAddedId = id;
@@ -749,11 +936,16 @@ async function saveEditComp(id){
   try{
     const type = document.getElementById(`editCompType-${id}`).value;
     const date = document.getElementById(`editCompDate-${id}`).value;
-    const days = parseFloat(document.getElementById(`editCompDays-${id}`).value);
+    const amount = parseFloat(document.getElementById(`editCompAmount-${id}`).value);
+    const unit = document.getElementById(`editCompUnit-${id}`).value;
     const note = document.getElementById(`editCompNote-${id}`).value.trim();
-    if(!date || isNaN(days) || days<=0){ setStatus('請填寫正確的日期與天數', false); return; }
+    if(!date || isNaN(amount) || amount<=0){ setStatus('請填寫正確的日期與數量', false); return; }
     const idx = state.compRecords.findIndex(r=>r.id===id);
-    if(idx>-1){ state.compRecords[idx] = Object.assign({}, state.compRecords[idx], {type,date,days,note}); }
+    if(idx>-1){
+      const updated = Object.assign({}, state.compRecords[idx], {type,date,unit,amount,note});
+      delete updated.days;
+      state.compRecords[idx] = updated;
+    }
     editing = null;
     await saveState();
     render();
@@ -789,14 +981,14 @@ function buildSummaryText(){
   LEAVE_TYPES.forEach(t=>{
     lines.push(`${t.label}：剩餘 ${fmt(remainOf(t.key, CUR_YEAR))} 天（共 ${fmt(getQuota(t.key, CUR_YEAR))} 天）`);
   });
-  lines.push(`補休：結餘 ${fmt(compBalanceUpTo(CUR_YEAR))} 天`);
+  lines.push(`補休：結餘 ${fmt(compBalanceUpTo(CUR_YEAR))} 天（≈ ${fmt(compBalanceUpTo(CUR_YEAR)*HOURS_PER_DAY)} 小時）`);
   lines.push('');
   lines.push('最近紀錄：');
   const combined = [];
   LEAVE_TYPES.forEach(t=>{
-    (state.records[t.key]||[]).forEach(r=> combined.push({date:r.date, text:`${t.label} 用 ${fmt(r.days)}天${r.note? '　'+r.note:''}`}));
+    (state.records[t.key]||[]).forEach(r=> combined.push({date:r.date, text:`${t.label} 用 ${displayAmount(r)}${r.note? '　'+r.note:''}`}));
   });
-  state.compRecords.forEach(r=> combined.push({date:r.date, text:`補休 ${r.type==='earn'?'獲得':'使用'} ${fmt(r.days)}天${r.note? '　'+r.note:''}`}));
+  state.compRecords.forEach(r=> combined.push({date:r.date, text:`補休 ${r.type==='earn'?'獲得':'使用'} ${displayAmount(r)}${r.note? '　'+r.note:''}`}));
   combined.sort((a,b)=> b.date.localeCompare(a.date));
   if(combined.length===0){ lines.push('（尚無紀錄）'); }
   else { combined.slice(0,10).forEach(c=> lines.push(`${c.date}　${c.text}`)); }
