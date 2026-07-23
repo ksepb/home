@@ -518,10 +518,10 @@ function dashboardPanel(){
 
 const KEYWORD_LEAVE_MAP = [
   {re:'特休|年假', key:'annual', label:'特休'},
-  {re:'病假', key:'sick', label:'病假'},
-  {re:'事假', key:'personal', label:'事假'},
-  {re:'家庭照顧假', key:'familyCare', label:'家庭照顧假'},
-  {re:'身心照顧假', key:'mentalCare', label:'身心照顧假'}
+  {re:'病假|病', key:'sick', label:'病假'},
+  {re:'事假|事', key:'personal', label:'事假'},
+  {re:'家庭照顧假|家照', key:'familyCare', label:'家庭照顧假'},
+  {re:'身心照顧假|身照|身心|不爽假', key:'mentalCare', label:'身心照顧假'}
 ];
 const KW_AMOUNT_TOKEN = '(半天|全天|整天|[\\d.]+)';
 const KW_UNIT_TOKEN = '(H|h|小時|天)?';
@@ -568,8 +568,8 @@ function kwBuildFromRest(rest, defaultCompType, leaveKeywordPattern){
   if(mm){
     return { kind:'comp', compType:'earn', unit:'day', amount: parseFloat(mm[1]), note:(mm[2]||'').trim() };
   }
-  // (使用|用|獲得|得)? 補休 X(H/天/半天/全天) (備註)
-  mm = rest.match(new RegExp(`^(使用|用|獲得|得)?\\s*補休\\s*${KW_AMOUNT_TOKEN}\\s*${KW_UNIT_TOKEN}\\s*${KW_NOTE_TOKEN}$`));
+  // (使用|用|獲得|得)? 補休/補 X(H/天/半天/全天) (備註)
+  mm = rest.match(new RegExp(`^(使用|用|獲得|得)?\\s*(?:補休|補)\\s*${KW_AMOUNT_TOKEN}\\s*${KW_UNIT_TOKEN}\\s*${KW_NOTE_TOKEN}$`));
   if(mm){
     const parsed = parseAmountToken(mm[2], mm[3]);
     if(!parsed) return null;
