@@ -83,6 +83,9 @@
   .quickdays{display:flex;gap:4px;}
   .quickdays button{padding:6px 8px;font-size:11px;background:#fff;color:var(--ink-soft);border:1px solid var(--line);font-weight:500;}
   .days-row{display:flex;gap:6px;align-items:center;}
+  .date-row{display:flex;gap:6px;align-items:center;}
+  .date-row input{flex:1;min-width:0;}
+  .date-toggle{padding:8px 9px;font-size:12px;background:#fff;color:var(--ink-soft);border:1px solid var(--line);font-weight:500;flex:none;}
   .days-row input[type=number]{width:64px;flex:none;}
   .field-days{flex:1 1 220px;min-width:220px;}
   button{font-family:'Noto Sans TC',sans-serif;font-size:13px;font-weight:700;padding:9px 16px;border:none;border-radius:4px;cursor:pointer;color:#fff;transition:transform .1s ease, opacity .15s ease;}
@@ -442,7 +445,7 @@ function leaveSection(t){
         <div class="hint">${t.hint}</div>
       </div>
       <form class="entry" onsubmit="addRecord('${t.key}', event)">
-        <div class="field"><label>使用日期</label><input type="date" id="${t.key}Date" value="${dDef}" min="${dMin}" max="${dMax}" required></div>
+        <div class="field"><label>使用日期</label><div class="date-row"><input type="date" id="${t.key}Date" value="${dDef}" min="${dMin}" max="${dMax}" required><button type="button" class="date-toggle" onclick="toggleDateInputType('${t.key}Date')" title="切換手動輸入">⌨</button></div></div>
         <div class="field field-days">
           <label>數量</label>
           <div class="days-row">
@@ -472,7 +475,7 @@ function leaveSection(t){
             const eu = r.unit || 'day';
             const ea = r.unit ? r.amount : r.days;
             return `<li class="editrow">
-              <input type="date" id="editDate-${t.key}-${r.id}" value="${r.date}" min="${dMin}" max="${dMax}">
+              <span class="date-row" style="flex:none;"><input type="date" id="editDate-${t.key}-${r.id}" value="${r.date}" min="${dMin}" max="${dMax}" style="width:130px;"><button type="button" class="date-toggle" onclick="toggleDateInputType('editDate-${t.key}-${r.id}')" title="切換手動輸入">⌨</button></span>
               <input type="number" id="editAmount-${t.key}-${r.id}" value="${ea}" min="0.5" step="0.5" style="width:70px;">
               <select id="editUnit-${t.key}-${r.id}" style="width:64px;">
                 <option value="day" ${eu==='day'?'selected':''}>天</option>
@@ -560,7 +563,7 @@ function render(){
             <option value="use">使用補休</option>
           </select>
         </div>
-        <div class="field"><label>日期</label><input type="date" id="compDate" value="${dDef}" min="${dMin}" max="${dMax}" onchange="onCompDateChange()" required></div>
+        <div class="field"><label>日期</label><div class="date-row"><input type="date" id="compDate" value="${dDef}" min="${dMin}" max="${dMax}" onchange="onCompDateChange()" required><button type="button" class="date-toggle" onclick="toggleDateInputType('compDate')" title="切換手動輸入">⌨</button></div></div>
         <div class="field field-days">
           <label>數量</label>
           <div class="days-row">
@@ -581,7 +584,7 @@ function render(){
             </div>
           </div>
         </div>
-        <div class="field" style="min-width:150px;"><label>到期日（選填）</label><input type="date" id="compExpiry" value="${addYears(dDef,2)}" oninput="expiryTouched=true"></div>
+        <div class="field" style="min-width:170px;"><label>到期日（選填）</label><div class="date-row"><input type="date" id="compExpiry" value="${addYears(dDef,2)}" oninput="expiryTouched=true"><button type="button" class="date-toggle" onclick="toggleDateInputType('compExpiry')" title="切換手動輸入">⌨</button></div></div>
         <div class="field note"><label>備註</label><input type="text" id="compNote" placeholder="例如：假日加班換休"></div>
         <button type="submit" class="btn-brick">登記</button>
       </form>
@@ -595,7 +598,7 @@ function render(){
                 <option value="earn" ${r.type==='earn'?'selected':''}>獲得補休</option>
                 <option value="use" ${r.type==='use'?'selected':''}>使用補休</option>
               </select>
-              <input type="date" id="editCompDate-${r.id}" value="${r.date}" min="${dMin}" max="${dMax}">
+              <span class="date-row" style="flex:none;"><input type="date" id="editCompDate-${r.id}" value="${r.date}" min="${dMin}" max="${dMax}" style="width:130px;"><button type="button" class="date-toggle" onclick="toggleDateInputType('editCompDate-${r.id}')" title="切換手動輸入">⌨</button></span>
               <input type="number" id="editCompAmount-${r.id}" value="${ea}" min="0.5" step="0.5" style="width:70px;">
               <select id="editCompUnit-${r.id}" style="width:64px;">
                 <option value="day" ${eu==='day'?'selected':''}>天</option>
@@ -663,6 +666,18 @@ function setStatus(msg, ok){
 }
 
 function setDays(id,val){ const el=document.getElementById(id); if(el) el.value = val; }
+
+function toggleDateInputType(id){
+  const el = document.getElementById(id);
+  if(!el) return;
+  if(el.type === 'date'){
+    el.type = 'text';
+    el.placeholder = 'YYYY-MM-DD';
+    el.setAttribute('pattern','\\d{4}-\\d{2}-\\d{2}');
+  } else {
+    el.type = 'date';
+  }
+}
 
 function onSearchInput(v){
   searchQuery = v;
