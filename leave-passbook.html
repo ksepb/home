@@ -194,10 +194,15 @@ function initFirebase(){
     fbDb = firebase.firestore();
     fbAuth.onAuthStateChanged(async (user)=>{
       currentUser = user;
-      if(user){ await pullOrPushOnSignIn(); }
       render();
     });
-    fbAuth.getRedirectResult().catch(e=>{
+    fbAuth.getRedirectResult().then(async (result)=>{
+      if(result && result.user){
+        // 真正剛從登入跳轉回來，才需要詢問雲端/本機衝突
+        await pullOrPushOnSignIn();
+        render();
+      }
+    }).catch(e=>{
       setStatus('登入失敗：' + (e && e.message ? e.message : String(e)), false);
     });
   }catch(e){ console.error('Firebase 初始化失敗', e); }
