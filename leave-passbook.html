@@ -78,14 +78,14 @@
   form.entry{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;align-items:flex-end;}
   .field{display:flex;flex-direction:column;gap:4px;flex:1;min-width:110px;}
   .field label{font-size:11px;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .field input,.field select{font-family:'Noto Sans TC',sans-serif;font-size:14px;padding:8px 9px;border:1px solid var(--line);border-radius:4px;background:#fff;color:var(--ink);}
+  .field input,.field select{font-family:'Noto Sans TC',sans-serif;font-size:13px;padding:7px 8px;border:1px solid var(--line);border-radius:4px;background:#fff;color:var(--ink);}
   .field.note{flex:2;min-width:140px;}
   .quickdays{display:flex;gap:4px;}
   .quickdays button{padding:6px 8px;font-size:11px;background:#fff;color:var(--ink-soft);border:1px solid var(--line);font-weight:500;}
   .days-row{display:flex;gap:6px;align-items:center;}
   .date-row{display:flex;gap:6px;align-items:center;}
   .date-row input{flex:1;min-width:0;}
-  .date-toggle{padding:8px 9px;font-size:12px;background:#fff;color:var(--ink-soft);border:1px solid var(--line);font-weight:500;flex:none;}
+  .date-toggle{padding:7px 8px;font-size:11px;background:#fff;color:var(--ink-soft);border:1px solid var(--line);font-weight:500;flex:none;}
   .days-row input[type=number]{width:64px;flex:none;}
   .field-days{flex:1 1 220px;min-width:220px;}
   button{font-family:'Noto Sans TC',sans-serif;font-size:13px;font-weight:700;padding:9px 16px;border:none;border-radius:4px;cursor:pointer;color:#fff;transition:transform .1s ease, opacity .15s ease;}
@@ -98,15 +98,18 @@
   .total-row .hint{flex-basis:100%;margin-top:-8px;}
 
   ul.ledger{list-style:none;margin:0;padding:0;}
-  ul.ledger li{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px dotted var(--line);font-size:14px;flex-wrap:wrap;}
-  ul.ledger li:last-child{border-bottom:none;}
-  ul.ledger .d{font-family:'IBM Plex Mono',monospace;color:var(--ink-soft);font-size:12px;min-width:82px;}
-  ul.ledger .tag{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;padding:2px 6px;border-radius:3px;min-width:32px;text-align:center;}
-  ul.ledger .days{font-family:'IBM Plex Mono',monospace;font-weight:700;min-width:44px;}
-  ul.ledger .note{flex:1;color:var(--ink-soft);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:60px;}
-  ul.ledger .expiry{font-size:10.5px;color:var(--amber);font-family:'IBM Plex Mono',monospace;}
-  ul.ledger .del{background:none;border:none;color:var(--ink-soft);font-size:15px;cursor:pointer;padding:0 4px;line-height:1;}
-  li.editrow{background:#fffaf0;border-radius:4px;padding:8px;gap:6px;}
+  ul.ledger li{display:block;padding:9px 10px;border:1px solid var(--line);border-radius:6px;background:#fff;font-size:14px;margin-bottom:7px;}
+  ul.ledger li:last-child{margin-bottom:0;}
+  ul.ledger .ledger-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  ul.ledger .ledger-bottom{display:flex;align-items:center;gap:8px;margin-top:8px;}
+  ul.ledger .d{font-family:'IBM Plex Mono',monospace;color:var(--ink-soft);font-size:12px;}
+  ul.ledger .tag{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;padding:2px 6px;border-radius:3px;text-align:center;}
+  ul.ledger .days{font-family:'IBM Plex Mono',monospace;font-weight:700;}
+  ul.ledger .note{color:var(--ink-soft);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;}
+  ul.ledger .expiry{font-size:10.5px;color:var(--amber);font-family:'IBM Plex Mono',monospace;flex:1;}
+  ul.ledger .ledger-actions{display:flex;gap:6px;margin-left:auto;flex:none;}
+  ul.ledger .del{background:#fff;border:1px solid var(--line);border-radius:4px;color:var(--ink-soft);font-size:12px;font-weight:500;cursor:pointer;padding:5px 9px;line-height:1;display:inline-flex;align-items:center;gap:3px;}
+  ul.ledger li.editrow{display:flex;flex-wrap:wrap;align-items:center;background:#fffaf0;border-radius:4px;padding:8px;gap:6px;}
   li.editrow input,li.editrow select{font-family:'Noto Sans TC',sans-serif;font-size:13px;padding:6px 8px;border:1px solid var(--line);border-radius:4px;}
   .empty{font-size:13px;color:var(--ink-soft);padding:8px 2px;}
 
@@ -178,6 +181,8 @@ let calYear = CUR_YEAR;
 let calMonth = NOW.getMonth()+1;
 let chartMode = false;
 let expiryTouched = false;
+let kwPendingItems = [];
+let kwUnmatchedLines = [];
 
 function onCompDateChange(){
   if(expiryTouched) return;
@@ -359,6 +364,128 @@ function dashboardPanel(){
 }
 
 
+const KEYWORD_LEAVE_MAP = [
+  {re:'特休|年假', key:'annual'},
+  {re:'病假', key:'sick'},
+  {re:'事假', key:'personal'},
+  {re:'家庭照顧假', key:'familyCare'},
+  {re:'身心照顧假', key:'mentalCare'}
+];
+
+function parseKeywordLines(text, defaultCompType){
+  const items = [];
+  const unmatched = [];
+  const lines = text.split('\n').map(l=>l.trim()).filter(l=>l.length>0);
+  const leaveKeywordPattern = KEYWORD_LEAVE_MAP.map(k=>k.re).join('|');
+
+  lines.forEach(line=>{
+    let m;
+
+    // 1) M/D 加X補Y (備註)  -> 補休獲得
+    m = line.match(/^(\d{1,2})\/(\d{1,2})\s*加\s*([\d.]+)\s*補\s*([\d.]+)\s*[\(（]?([^\)）]*)[\)）]?\s*$/);
+    if(m){
+      items.push({ kind:'comp', date: isoDate(selectedYear, parseInt(m[1],10), parseInt(m[2],10)),
+        compType:'earn', unit:'day', amount: parseFloat(m[4]), note: (m[5]||'').trim(), raw: line });
+      return;
+    }
+
+    // 2) M/D 補休X H/天 (備註) -> 補休（預設類型由使用者選擇）
+    m = line.match(/^(\d{1,2})\/(\d{1,2})\s*補休\s*([\d.]+)\s*(H|h|小時|天)?\s*[\(（]?([^\)）]*)[\)）]?\s*$/);
+    if(m){
+      const unit = (m[4]==='H'||m[4]==='h'||m[4]==='小時') ? 'hour' : 'day';
+      items.push({ kind:'comp', date: isoDate(selectedYear, parseInt(m[1],10), parseInt(m[2],10)),
+        compType: defaultCompType, unit, amount: parseFloat(m[3]), note: (m[5]||'').trim(), raw: line });
+      return;
+    }
+
+    // 3) 特休/年假 原X剩Y -> 更新特休總天數（僅供參考，不建立單筆紀錄）
+    m = line.match(/^(特休|年假)\s*(?:原)?\s*([\d.]+)\s*剩\s*([\d.]+)/);
+    if(m){
+      items.push({ kind:'quota', quotaKey:'annual', quotaLabel:'特休', total: parseFloat(m[2]), remain: parseFloat(m[3]), raw: line });
+      return;
+    }
+
+    // 4) M/D <假別關鍵字>X H/天 (備註) -> 一般假別使用
+    const genericRe = new RegExp(`^(\\d{1,2})/(\\d{1,2})\\s*(${leaveKeywordPattern})\\s*([\\d.]+)\\s*(H|h|小時|天)?\\s*[\\(（]?([^\\)）]*)[\\)）]?\\s*$`);
+    m = line.match(genericRe);
+    if(m){
+      const mapEntry = KEYWORD_LEAVE_MAP.find(k=> new RegExp('^(?:'+k.re+')$').test(m[3]));
+      const unit = (m[5]==='H'||m[5]==='h'||m[5]==='小時') ? 'hour' : 'day';
+      items.push({ kind:'leave', leaveKey: mapEntry.key, leaveLabel: m[3], date: isoDate(selectedYear, parseInt(m[1],10), parseInt(m[2],10)),
+        unit, amount: parseFloat(m[4]), note: (m[6]||'').trim(), raw: line });
+      return;
+    }
+
+    unmatched.push(line);
+  });
+
+  return { items, unmatched };
+}
+
+function keywordPanel(){
+  const previewHtml = kwPendingItems.length? `
+    <div style="margin-top:12px;">
+      <div style="font-size:12.5px;color:var(--ink-soft);margin-bottom:8px;">辨識出以下 ${kwPendingItems.length} 筆，確認後才會登記：</div>
+      <ul class="ledger">
+        ${kwPendingItems.map((it,idx)=>{
+          let label, amountText;
+          if(it.kind==='quota'){
+            label = `${it.quotaLabel}總天數`;
+            amountText = `更新為 ${fmt(it.total)} 天`;
+          } else if(it.kind==='comp'){
+            label = `補休（${it.compType==='use'?'使用':'獲得'}）`;
+            amountText = `${fmt(it.amount)} ${it.unit==='hour'?'小時':'天'}`;
+          } else {
+            label = it.leaveLabel;
+            amountText = `${fmt(it.amount)} ${it.unit==='hour'?'小時':'天'}`;
+          }
+          return `<li>
+            <div class="ledger-top">
+              <span class="d">${it.date? toROC(it.date) : '－'}</span>
+              <span class="tag" style="background:var(--paper-deep);color:var(--ink-soft);">${escapeHtml(label)}</span>
+              <span class="days">${escapeHtml(amountText)}</span>
+              ${it.note? `<span class="note">${escapeHtml(it.note)}</span>` : ''}
+            </div>
+            <div class="ledger-bottom">
+              <div></div>
+              <div class="ledger-actions"><button class="del" title="移除" onclick="removeKwItem(${idx})">✕ 移除</button></div>
+            </div>
+          </li>`;
+        }).join('')}
+      </ul>
+      <div class="row" style="margin-top:10px;">
+        <button class="btn-jade" onclick="applyKwItems()">確認新增全部</button>
+        <button class="ghost" onclick="cancelKwItems()">取消</button>
+      </div>
+    </div>` : '';
+  const unmatchedHtml = kwUnmatchedLines.length? `
+    <div style="margin-top:10px;font-size:12px;color:var(--brick);">
+      無法辨識的行（可能格式不符，可自行手動登記）：<br>
+      ${kwUnmatchedLines.map(l=>escapeHtml(l)).join('<br>')}
+    </div>` : '';
+  return `
+    <div class="block">
+      <h2><span class="dot dot-jade"></span>關鍵字快速輸入</h2>
+      <p class="hint" style="margin-bottom:8px;">貼上像「2/16 加1補1 (除夕)」「3/25 補休4H (性別平等)」「年假原4.5剩3.5」這樣的紀錄，一行一筆，用關鍵字規則自動辨識（不經過 AI，純本機比對）。日期預設為目前瀏覽的 ${selectedYear} 年。</p>
+      <div class="field" style="max-width:220px;margin-bottom:8px;">
+        <label>沒寫「加」字的補休，預設當作</label>
+        <select id="kwDefaultCompType">
+          <option value="earn">獲得補休</option>
+          <option value="use">使用補休</option>
+        </select>
+      </div>
+      <textarea id="kwInputText" rows="5" placeholder="例如：
+2/16 加1補1 (除夕)
+3/25 補休4H (性別平等)
+年假原4.5剩3.5"></textarea>
+      <div class="row" style="margin-top:8px;">
+        <button class="btn-jade" onclick="kwParseInput()">解析</button>
+      </div>
+      ${previewHtml}
+      ${unmatchedHtml}
+    </div>`;
+}
+
 function compExpiryReminders(){
   if(compBalanceUpTo(CUR_YEAR) <= 0) return [];
   const todayD = new Date(TODAY);
@@ -526,12 +653,18 @@ function leaveSection(t){
             </li>`;
           }
           return `<li class="${r.id===lastAddedId?'stamp-in':''}">
-            <span class="d">${toROC(r.date)}</span>
-            <span class="tag" style="background:var(--${t.c}-soft);color:var(--${t.c});">用</span>
-            <span class="days">${displayAmount(r)}</span>
-            <span class="note">${r.note? escapeHtml(r.note):''}</span>
-            <button class="del" title="編輯" onclick="startEditRecord('${t.key}','${r.id}')">✎</button>
-            <button class="del" title="刪除" onclick="removeRecord('${t.key}','${r.id}')">✕</button>
+            <div class="ledger-top">
+              <span class="d">${toROC(r.date)}</span>
+              <span class="tag" style="background:var(--${t.c}-soft);color:var(--${t.c});">用</span>
+              <span class="days">${displayAmount(r)}</span>
+              ${r.note? `<span class="note">${escapeHtml(r.note)}</span>` : ''}
+            </div>
+            <div class="ledger-bottom">
+              <div class="ledger-actions">
+                <button class="del" title="編輯" onclick="startEditRecord('${t.key}','${r.id}')">✎ 編輯</button>
+                <button class="del" title="刪除" onclick="removeRecord('${t.key}','${r.id}')">✕ 刪除</button>
+              </div>
+            </div>
           </li>`;
         }).join('') : `<div class="empty">${emptyMsg}</div>`}
       </ul>
@@ -576,7 +709,10 @@ function compSectionHtml(){
             </div>
           </div>
         </div>
-        <div class="field" style="min-width:170px;"><label>到期日（選填）</label><div class="date-row"><input type="date" id="compExpiry" value="${addYears(dDef,2)}" oninput="expiryTouched=true"><button type="button" class="date-toggle" onclick="toggleDateInputType('compExpiry')" title="切換手動輸入">⌨</button></div></div>
+        <div class="field" style="min-width:210px;">
+          <label>⏳ 到期日（選填，非登記日期）</label>
+          <div class="date-row"><input type="date" id="compExpiry" value="${addYears(dDef,2)}" oninput="expiryTouched=true"><button type="button" class="date-toggle" onclick="toggleDateInputType('compExpiry')" title="切換手動輸入">⌨</button></div>
+        </div>
         <div class="field note"><label>備註</label><input type="text" id="compNote" placeholder="例如：假日加班換休"></div>
         <button type="submit" class="btn-brick">登記</button>
       </form>
@@ -602,13 +738,19 @@ function compSectionHtml(){
             </li>`;
           }
           return `<li class="${r.id===lastAddedId?'stamp-in':''}">
-            <span class="d">${toROC(r.date)}</span>
-            <span class="tag" style="background:var(--brick-soft);color:var(--brick);">${r.type==='earn'?'獲得':'使用'}</span>
-            <span class="days">${r.type==='earn'?'+':'-'}${displayAmount(r)}</span>
-            <span class="note">${r.note? escapeHtml(r.note):''}</span>
-            ${r.expiry? `<span class="expiry">到期 ${toROC(r.expiry)}</span>`:''}
-            <button class="del" title="編輯" onclick="startEditComp('${r.id}')">✎</button>
-            <button class="del" title="刪除" onclick="removeComp('${r.id}')">✕</button>
+            <div class="ledger-top">
+              <span class="d">${toROC(r.date)}</span>
+              <span class="tag" style="background:var(--brick-soft);color:var(--brick);">${r.type==='earn'?'獲得':'使用'}</span>
+              <span class="days">${r.type==='earn'?'+':'-'}${displayAmount(r)}</span>
+              ${r.note? `<span class="note">${escapeHtml(r.note)}</span>` : ''}
+            </div>
+            <div class="ledger-bottom">
+              ${r.expiry? `<div class="expiry">⏳ 補休到期日：${toROC(r.expiry)}</div>`:'<div></div>'}
+              <div class="ledger-actions">
+                <button class="del" title="編輯" onclick="startEditComp('${r.id}')">✎ 編輯</button>
+                <button class="del" title="刪除" onclick="removeComp('${r.id}')">✕ 刪除</button>
+              </div>
+            </div>
           </li>`;
         }).join('') : `<div class="empty">${compEmptyMsg}</div>`}
       </ul>
@@ -640,6 +782,7 @@ function render(){
     </div>
 
     ${dashboardPanel()}
+    ${keywordPanel()}
 
     <div class="toolbar">
       <div class="toolbar-row">
@@ -870,6 +1013,48 @@ function onCompUnitChange(){
   const hourQ = document.getElementById('compQuickHour');
   if(unit==='hour'){ dayQ.style.display='none'; hourQ.style.display='flex'; }
   else { dayQ.style.display='flex'; hourQ.style.display='none'; }
+}
+
+function kwParseInput(){
+  const text = document.getElementById('kwInputText').value;
+  const defaultCompType = document.getElementById('kwDefaultCompType').value;
+  if(!text || !text.trim()){ setStatus('請先貼上想登記的內容', false); return; }
+  const { items, unmatched } = parseKeywordLines(text, defaultCompType);
+  if(items.length===0){ setStatus('沒有辨識出可登記的資料，請確認格式', false); }
+  else { setStatus(`辨識出 ${items.length} 筆，請確認後新增`, true); }
+  kwPendingItems = items;
+  kwUnmatchedLines = unmatched;
+  render();
+}
+
+function removeKwItem(idx){ kwPendingItems.splice(idx,1); render(); }
+function cancelKwItems(){ kwPendingItems = []; kwUnmatchedLines = []; render(); }
+
+async function applyKwItems(){
+  try{
+    kwPendingItems.forEach(item=>{
+      if(item.kind==='quota'){
+        setQuota(item.quotaKey, selectedYear, item.total);
+        return;
+      }
+      const id = uid();
+      if(item.kind==='comp'){
+        const rec = { id, type:item.compType, date:item.date, unit:item.unit, amount:Number(item.amount), note:item.note||'' };
+        if(rec.type==='earn'){ rec.expiry = addYears(item.date, 2); }
+        state.compRecords.push(rec);
+      } else if(item.kind==='leave'){
+        if(!state.records[item.leaveKey]) state.records[item.leaveKey]=[];
+        state.records[item.leaveKey].push({ id, date:item.date, unit:item.unit, amount:Number(item.amount), note:item.note||'' });
+      }
+    });
+    kwPendingItems = [];
+    kwUnmatchedLines = [];
+    await saveState();
+    render();
+    setStatus('已新增解析出的紀錄', true);
+  }catch(err){
+    setStatus('新增失敗：' + (err && err.message ? err.message : String(err)), false);
+  }
 }
 
 async function addComp(e){
