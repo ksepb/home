@@ -181,7 +181,7 @@ let expiryTouched = false;
 
 function onCompDateChange(){
   if(expiryTouched) return;
-  const dateVal = document.getElementById('compDate').value;
+  const dateVal = parseFlexibleDate(document.getElementById('compDate').value);
   const expiryEl = document.getElementById('compExpiry');
   if(dateVal && expiryEl) expiryEl.value = addYears(dateVal, 2);
 }
@@ -272,6 +272,45 @@ function remainOf(key, year){
   year = year || selectedYear;
   return getQuota(key,year) - usedOf(key,year);
 }
+function isoDate(y,m,d){
+  if(!y||!m||!d) return '';
+  return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+}
+function parseFlexibleDate(raw){
+  if(!raw) return '';
+  raw = String(raw).trim();
+  if(/^\d{4}-\d{1,2}-\d{1,2}$/.test(raw)){
+    const [y,m,d] = raw.split('-').map(Number);
+    return isoDate(y,m,d);
+  }
+  if(raw.includes('/')){
+    const parts = raw.split('/').map(s=>s.trim());
+    if(parts.length===3){
+      let y = parseInt(parts[0],10);
+      const m = parseInt(parts[1],10);
+      const d = parseInt(parts[2],10);
+      if(!isNaN(y) && y < 200) y += 1911; // 兩三位數視為民國年
+      return isoDate(y,m,d);
+    }
+    if(parts.length===2){
+      const m = parseInt(parts[0],10);
+      const d = parseInt(parts[1],10);
+      return isoDate(CUR_YEAR, m, d); // 沒填年份，預設今年
+    }
+  }
+  return raw;
+}
+
+function toROC(dateStr){
+  if(!dateStr) return '';
+  const parts = String(dateStr).split('-');
+  if(parts.length!==3) return dateStr;
+  const y = parseInt(parts[0],10) - 1911;
+  const m = parseInt(parts[1],10);
+  const d = parseInt(parts[2],10);
+  if(isNaN(y) || isNaN(m) || isNaN(d)) return dateStr;
+  return `${y}/${m}/${d}`;
+}
 function toDays(r){
   if(r.unit==='hour') return Number(r.amount)/HOURS_PER_DAY;
   if(r.unit==='day') return Number(r.amount);
@@ -334,7 +373,7 @@ function reminderBanner(){
   if(list.length===0) return '';
   const items = list.map(r=>{
     const statusTxt = r.diffDays < 0 ? `已過期 ${Math.abs(r.diffDays)} 天` : (r.diffDays===0? '今天到期' : `${r.diffDays} 天後到期`);
-    return `${r.date} 獲得的 ${displayAmount(r)}補休，到期日 ${r.expiry}（${statusTxt}）`;
+    return `${toROC(r.date)} 獲得的 ${displayAmount(r)}補休，到期日 ${toROC(r.expiry)}（${statusTxt}）`;
   }).join('<br>');
   return `<div class="reminder-bar"><strong>⚠️ 補休到期提醒</strong>${items}</div>`;
 }
@@ -487,7 +526,7 @@ function leaveSection(t){
             </li>`;
           }
           return `<li class="${r.id===lastAddedId?'stamp-in':''}">
-            <span class="d">${r.date}</span>
+            <span class="d">${toROC(r.date)}</span>
             <span class="tag" style="background:var(--${t.c}-soft);color:var(--${t.c});">用</span>
             <span class="days">${displayAmount(r)}</span>
             <span class="note">${r.note? escapeHtml(r.note):''}</span>
@@ -499,60 +538,13 @@ function leaveSection(t){
     </section>`;
 }
 
-function render(){
-  expiryTouched = false;
+function compSectionHtml(){
   const allComp = state.compRecords.filter(r=>r.date.startsWith(String(selectedYear)));
   let compRows = allComp.filter(r=>matchesSearch(r.date, r.note, '補休', r.type==='earn'?'獲得':'使用'));
   compRows.sort((a,b)=> sortAsc ? a.date.localeCompare(b.date) : b.date.localeCompare(a.date));
   const compEmptyMsg = allComp.length===0 ? `${selectedYear} 年尚無補休紀錄` : '查無符合搜尋的紀錄';
-  const compBal = compBalanceUpTo(selectedYear);
   const dMin = yearMin(selectedYear), dMax = yearMax(selectedYear), dDef = defaultDateFor(selectedYear);
-
-  document.getElementById('app').innerHTML = `
-    <header>
-      <div class="eyebrow">Leave Passbook</div>
-      <h1>假期存摺</h1>
-      <p class="sub">特休、病假、事假、家庭照顧假、身心照顧假、補休，一本記清楚</p>
-    </header>
-
-    ${lastDeleted? `<div class="undo-bar"><span>已刪除：${escapeHtml(lastDeleted.label)}</span><button onclick="undoDelete()">復原</button></div>` : ''}
-    ${reminderBanner()}
-
-    <div class="stamps">
-      ${LEAVE_TYPES.map(stampCard).join('')}
-      <div class="stamp-card ${compBal<0?'warn':''}">
-        <div class="seal c-brick">補</div>
-        <div class="label">補休結餘</div>
-        <div class="num">${fmt(compBal)}<small>天 ≈ ${fmt(compBal*HOURS_PER_DAY)} 小時（至 ${selectedYear} 年底）</small></div>
-      </div>
-    </div>
-
-    ${dashboardPanel()}
-
-    <div class="toolbar">
-      <div class="toolbar-row">
-        <input type="text" id="searchInput" placeholder="搜尋日期或備註…" value="${escapeAttr(searchQuery)}" oninput="onSearchInput(this.value)">
-        <button type="button" class="sortbtn" onclick="toggleSort()">日期 ${sortAsc? '▲ 舊到新':'▼ 新到舊'}</button>
-      </div>
-      <div class="toolbar-row">
-        <div class="year-switch">
-          <button type="button" class="sortbtn" onclick="changeYear(-1)">‹</button>
-          <div class="year-label">${selectedYear} 年</div>
-          <button type="button" class="sortbtn" onclick="changeYear(1)">›</button>
-        </div>
-      </div>
-      <div class="toolbar-row view-toggles">
-        <button type="button" class="sortbtn" onclick="toggleCalendar()">${calendarMode?'隱藏行事曆':'📅 行事曆檢視'}</button>
-        <button type="button" class="sortbtn" onclick="toggleChart()">${chartMode?'隱藏統計圖':'📊 年度統計圖'}</button>
-      </div>
-    </div>
-
-    ${calendarPanel()}
-    ${statsChart()}
-
-    <div class="section-label">各假別紀錄（可用「天」或「小時」登記，1 天 = 8 小時）</div>
-    ${LEAVE_TYPES.map(leaveSection).join('')}
-
+  return `
     <section class="block">
       <h2><span class="dot dot-brick"></span>補休</h2>
       <div class="hint" style="margin-bottom:10px;">可選擇用「天」或「小時」登記，換算比例為 1 天 = 8 小時</div>
@@ -610,17 +602,71 @@ function render(){
             </li>`;
           }
           return `<li class="${r.id===lastAddedId?'stamp-in':''}">
-            <span class="d">${r.date}</span>
+            <span class="d">${toROC(r.date)}</span>
             <span class="tag" style="background:var(--brick-soft);color:var(--brick);">${r.type==='earn'?'獲得':'使用'}</span>
             <span class="days">${r.type==='earn'?'+':'-'}${displayAmount(r)}</span>
             <span class="note">${r.note? escapeHtml(r.note):''}</span>
-            ${r.expiry? `<span class="expiry">到期 ${r.expiry}</span>`:''}
+            ${r.expiry? `<span class="expiry">到期 ${toROC(r.expiry)}</span>`:''}
             <button class="del" title="編輯" onclick="startEditComp('${r.id}')">✎</button>
             <button class="del" title="刪除" onclick="removeComp('${r.id}')">✕</button>
           </li>`;
         }).join('') : `<div class="empty">${compEmptyMsg}</div>`}
       </ul>
     </section>
+`;
+}
+
+function render(){
+  expiryTouched = false;
+  const compBal = compBalanceUpTo(selectedYear);
+
+  document.getElementById('app').innerHTML = `
+    <header>
+      <div class="eyebrow">Leave Passbook</div>
+      <h1>假期存摺</h1>
+      <p class="sub">特休、病假、事假、家庭照顧假、身心照顧假、補休，一本記清楚</p>
+    </header>
+
+    ${lastDeleted? `<div class="undo-bar"><span>已刪除：${escapeHtml(lastDeleted.label)}</span><button onclick="undoDelete()">復原</button></div>` : ''}
+    ${reminderBanner()}
+
+    <div class="stamps">
+      ${LEAVE_TYPES.map(stampCard).join('')}
+      <div class="stamp-card ${compBal<0?'warn':''}">
+        <div class="seal c-brick">補</div>
+        <div class="label">補休結餘</div>
+        <div class="num">${fmt(compBal)}<small>天 ≈ ${fmt(compBal*HOURS_PER_DAY)} 小時（至 ${selectedYear} 年底）</small></div>
+      </div>
+    </div>
+
+    ${dashboardPanel()}
+
+    <div class="toolbar">
+      <div class="toolbar-row">
+        <input type="text" id="searchInput" placeholder="搜尋日期或備註…" value="${escapeAttr(searchQuery)}" oninput="onSearchInput(this.value)">
+        <button type="button" class="sortbtn" onclick="toggleSort()">日期 ${sortAsc? '▲ 舊到新':'▼ 新到舊'}</button>
+      </div>
+      <div class="toolbar-row">
+        <div class="year-switch">
+          <button type="button" class="sortbtn" onclick="changeYear(-1)">‹</button>
+          <div class="year-label">${selectedYear} 年</div>
+          <button type="button" class="sortbtn" onclick="changeYear(1)">›</button>
+        </div>
+      </div>
+      <div class="toolbar-row view-toggles">
+        <button type="button" class="sortbtn" onclick="toggleCalendar()">${calendarMode?'隱藏行事曆':'📅 行事曆檢視'}</button>
+        <button type="button" class="sortbtn" onclick="toggleChart()">${chartMode?'隱藏統計圖':'📊 年度統計圖'}</button>
+      </div>
+    </div>
+
+    ${calendarPanel()}
+    ${statsChart()}
+
+    <div class="section-label">各假別紀錄（可用「天」或「小時」登記，1 天 = 8 小時）</div>
+    ${leaveSection(LEAVE_TYPES[0])}
+    ${compSectionHtml()}
+    ${LEAVE_TYPES.slice(1).map(leaveSection).join('')}
+
 
     <div class="section-label">資料管理</div>
     <div class="manage-grid">
@@ -672,8 +718,10 @@ function toggleDateInputType(id){
   if(!el) return;
   if(el.type === 'date'){
     el.type = 'text';
-    el.placeholder = 'YYYY-MM-DD';
-    el.setAttribute('pattern','\\d{4}-\\d{2}-\\d{2}');
+    el.removeAttribute('pattern');
+    el.placeholder = '例：7/23、115/7/23、2026-07-23';
+    el.value = '';
+    el.focus();
   } else {
     el.type = 'date';
   }
@@ -728,7 +776,7 @@ function onUnitChange(key){
 async function addRecord(key, e){
   e.preventDefault();
   try{
-    const date = document.getElementById(key+'Date').value;
+    const date = parseFlexibleDate(document.getElementById(key+'Date').value);
     const unit = document.getElementById(key+'Unit').value;
     const amount = parseFloat(document.getElementById(key+'Amount').value);
     const note = document.getElementById(key+'Note').value.trim();
@@ -757,7 +805,7 @@ function cancelEdit(){ editing = null; render(); }
 
 async function saveEditRecord(key,id){
   try{
-    const date = document.getElementById(`editDate-${key}-${id}`).value;
+    const date = parseFlexibleDate(document.getElementById(`editDate-${key}-${id}`).value);
     const amount = parseFloat(document.getElementById(`editAmount-${key}-${id}`).value);
     const unit = document.getElementById(`editUnit-${key}-${id}`).value;
     const note = document.getElementById(`editNote-${key}-${id}`).value.trim();
@@ -794,7 +842,7 @@ async function removeRecord(key, id){
     const item = arr[idx];
     arr.splice(idx,1);
     const label = (LEAVE_TYPES.find(t=>t.key===key)||{}).label || key;
-    registerUndo({ kind:'record', key, item, index: idx, label: `${label} ${item.date} ${fmt(item.days)}天` });
+    registerUndo({ kind:'record', key, item, index: idx, label: `${label} ${toROC(item.date)} ${displayAmount(item)}` });
     await saveState();
     render();
   }catch(err){
@@ -828,10 +876,10 @@ async function addComp(e){
   e.preventDefault();
   try{
     const type = document.getElementById('compType').value;
-    const date = document.getElementById('compDate').value;
+    const date = parseFlexibleDate(document.getElementById('compDate').value);
     const unit = document.getElementById('compUnit').value;
     const amount = parseFloat(document.getElementById('compAmount').value);
-    const expiry = document.getElementById('compExpiry').value || null;
+    const expiry = parseFlexibleDate(document.getElementById('compExpiry').value) || null;
     const note = document.getElementById('compNote').value.trim();
     if(!date || isNaN(amount) || amount<=0){ setStatus('請填寫日期與數量', false); return; }
     const daysEquiv = unit==='hour' ? amount/HOURS_PER_DAY : amount;
@@ -860,7 +908,7 @@ async function startEditComp(id){ editing = {kind:'comp', id}; render(); }
 async function saveEditComp(id){
   try{
     const type = document.getElementById(`editCompType-${id}`).value;
-    const date = document.getElementById(`editCompDate-${id}`).value;
+    const date = parseFlexibleDate(document.getElementById(`editCompDate-${id}`).value);
     const amount = parseFloat(document.getElementById(`editCompAmount-${id}`).value);
     const unit = document.getElementById(`editCompUnit-${id}`).value;
     const note = document.getElementById(`editCompNote-${id}`).value.trim();
@@ -888,7 +936,7 @@ async function removeComp(id){
     if(idx===-1) return;
     const item = state.compRecords[idx];
     state.compRecords.splice(idx,1);
-    registerUndo({ kind:'comp', item, index: idx, label: `補休 ${item.date} ${fmt(item.days)}天` });
+    registerUndo({ kind:'comp', item, index: idx, label: `補休 ${toROC(item.date)} ${displayAmount(item)}` });
     await saveState();
     render();
   }catch(err){
@@ -916,7 +964,7 @@ function buildSummaryText(){
   state.compRecords.forEach(r=> combined.push({date:r.date, text:`補休 ${r.type==='earn'?'獲得':'使用'} ${displayAmount(r)}${r.note? '　'+r.note:''}`}));
   combined.sort((a,b)=> b.date.localeCompare(a.date));
   if(combined.length===0){ lines.push('（尚無紀錄）'); }
-  else { combined.slice(0,10).forEach(c=> lines.push(`${c.date}　${c.text}`)); }
+  else { combined.slice(0,10).forEach(c=> lines.push(`${toROC(c.date)}　${c.text}`)); }
   return lines.join('\n');
 }
 
