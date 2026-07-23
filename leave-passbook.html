@@ -138,6 +138,12 @@
   .legend-dot{width:9px;height:9px;border-radius:50%;display:inline-block;}
 
   .backup{background:rgba(255,255,255,.85);border:1px solid var(--line);border-radius:6px;padding:18px 16px 20px;}
+  .backup.danger-zone{border-color:var(--brick);background:rgba(241,223,218,.5);margin-bottom:20px;}
+  .backup.danger-zone h2{color:var(--brick);}
+  .reset-row{display:flex;align-items:center;gap:8px;margin-top:12px;padding-top:12px;border-top:1px dashed var(--line);flex-wrap:wrap;}
+  .reset-label{font-size:12px;color:var(--ink-soft);}
+  .reset-row select{font-family:'Noto Sans TC',sans-serif;font-size:12.5px;padding:6px 7px;border:1px solid var(--line);border-radius:4px;background:#fff;color:var(--ink);}
+  .danger-btn{background:#fff;color:var(--brick);border:1px solid var(--brick);font-weight:700;padding:6px 12px;font-size:12.5px;}
   .backup h2{font-family:'Noto Serif TC',serif;font-size:16px;margin:0 0 6px;}
   .backup p{font-size:12.5px;color:var(--ink-soft);margin:0 0 12px;line-height:1.6;}
   .backup .row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;}
@@ -480,6 +486,7 @@ function keywordPanel(){
 年假原4.5剩3.5"></textarea>
       <div class="row" style="margin-top:8px;">
         <button class="btn-jade" onclick="kwParseInput()">解析</button>
+        <button class="ghost" onclick="kwClearInput()">清空重填</button>
       </div>
       ${previewHtml}
       ${unmatchedHtml}
@@ -668,6 +675,16 @@ function leaveSection(t){
           </li>`;
         }).join('') : `<div class="empty">${emptyMsg}</div>`}
       </ul>
+      <div class="reset-row">
+        <span class="reset-label">清除紀錄：</span>
+        <select id="${t.key}ResetScope">
+          <option value="day">指定某天</option>
+          <option value="month">指定某月</option>
+          <option value="year">指定某年</option>
+          <option value="all">全部</option>
+        </select>
+        <button class="danger-btn" onclick="resetRecords(document.getElementById('${t.key}ResetScope').value, '${t.key}')">重置</button>
+      </div>
     </section>`;
 }
 
@@ -754,6 +771,16 @@ function compSectionHtml(){
           </li>`;
         }).join('') : `<div class="empty">${compEmptyMsg}</div>`}
       </ul>
+      <div class="reset-row">
+        <span class="reset-label">清除紀錄：</span>
+        <select id="compResetScope">
+          <option value="day">指定某天</option>
+          <option value="month">指定某月</option>
+          <option value="year">指定某年</option>
+          <option value="all">全部</option>
+        </select>
+        <button class="danger-btn" onclick="resetRecords(document.getElementById('compResetScope').value, 'comp')">重置</button>
+      </div>
     </section>
 `;
 }
@@ -839,6 +866,20 @@ function render(){
             <button style="background:var(--ink-soft);" onclick="restoreBackup()">確認還原（會覆蓋目前資料）</button>
           </div>
         </div>
+      </div>
+    </div>
+
+    <div class="backup danger-zone">
+      <h2>⚠️ 整體重置</h2>
+      <p>清除「所有假別＋補休」在指定範圍內的紀錄，會直接刪除、沒有復原按鈕，執行前請務必先備份。</p>
+      <div class="row">
+        <select id="allResetScope">
+          <option value="day">指定某天</option>
+          <option value="month">指定某月</option>
+          <option value="year">指定某年</option>
+          <option value="all">全部（清空所有紀錄）</option>
+        </select>
+        <button class="danger-btn" onclick="resetRecords(document.getElementById('allResetScope').value, 'ALL')">整體重置</button>
       </div>
     </div>
     <div class="status" id="statusMsg" style="text-align:center;"></div>
@@ -1027,10 +1068,27 @@ function kwParseInput(){
   render();
 }
 
+function kwClearInput(){
+  const ta = document.getElementById('kwInputText');
+  if(ta && ta.value.trim() && !window.confirm('確定要清空目前輸入的文字嗎？')) return;
+  if(ta) ta.value = '';
+  kwPendingItems = [];
+  kwUnmatchedLines = [];
+  render();
+}
+
 function removeKwItem(idx){ kwPendingItems.splice(idx,1); render(); }
 function cancelKwItems(){ kwPendingItems = []; kwUnmatchedLines = []; render(); }
 
 async function applyKwItems(){
+  const recordCount = kwPendingItems.filter(it=>it.kind!=='quota').length;
+  const quotaItems = kwPendingItems.filter(it=>it.kind==='quota');
+  let msg = `確定要新增這 ${kwPendingItems.length} 筆嗎？`;
+  if(quotaItems.length>0){
+    msg += `\n其中包含 ${quotaItems.length} 筆會直接覆蓋「總天數」設定：\n` +
+      quotaItems.map(q=>`・${q.quotaLabel}總天數 → ${fmt(q.total)} 天`).join('\n');
+  }
+  if(!window.confirm(msg)) return;
   try{
     kwPendingItems.forEach(item=>{
       if(item.kind==='quota'){
@@ -1055,6 +1113,56 @@ async function applyKwItems(){
   }catch(err){
     setStatus('新增失敗：' + (err && err.message ? err.message : String(err)), false);
   }
+}
+
+async function resetRecords(scope, key){
+  let matcher, scopeLabel;
+  if(scope==='day'){
+    const d = window.prompt('請輸入要清除的日期（格式 YYYY-MM-DD），例如 2026-07-23', TODAY);
+    if(!d) return;
+    if(!/^\d{4}-\d{1,2}-\d{1,2}$/.test(d.trim())){ alert('日期格式不對，請用 YYYY-MM-DD'); return; }
+    const iso = parseFlexibleDate(d.trim());
+    matcher = ds => ds===iso;
+    scopeLabel = `${toROC(iso)} 當天`;
+  } else if(scope==='month'){
+    const input = window.prompt('請輸入要清除的年月（格式 YYYY-MM），例如 2026-07', `${selectedYear}-${String(NOW.getMonth()+1).padStart(2,'0')}`);
+    if(!input) return;
+    if(!/^\d{4}-\d{1,2}$/.test(input.trim())){ alert('格式不對，請用 YYYY-MM'); return; }
+    const parts = input.trim().split('-');
+    const norm = `${parts[0]}-${parts[1].padStart(2,'0')}`;
+    matcher = ds => ds.startsWith(norm);
+    scopeLabel = `${norm} 整月`;
+  } else if(scope==='year'){
+    const input = window.prompt('請輸入要清除的年度（西元），例如 2026', String(selectedYear));
+    if(!input) return;
+    if(!/^\d{4}$/.test(input.trim())){ alert('格式不對，請輸入 4 位數西元年'); return; }
+    matcher = ds => ds.startsWith(input.trim());
+    scopeLabel = `西元 ${input.trim()} 年全年`;
+  } else {
+    matcher = () => true;
+    scopeLabel = '全部（不限日期）';
+  }
+
+  const keysToClear = key==='ALL' ? LEAVE_TYPES.map(t=>t.key).concat(['comp']) : [key];
+  let count = 0;
+  keysToClear.forEach(k=>{
+    if(k==='comp'){ count += state.compRecords.filter(r=>matcher(r.date)).length; }
+    else { count += (state.records[k]||[]).filter(r=>matcher(r.date)).length; }
+  });
+
+  if(count===0){ setStatus('這個範圍內沒有符合的紀錄', false); return; }
+
+  const targetLabel = key==='ALL' ? '所有假別（含補休）' : (key==='comp' ? '補休' : ((LEAVE_TYPES.find(t=>t.key===key)||{}).label||key));
+  if(!window.confirm(`確定要清除「${targetLabel}」在 ${scopeLabel} 的 ${count} 筆紀錄嗎？\n此動作會直接刪除，沒有復原按鈕。`)) return;
+
+  keysToClear.forEach(k=>{
+    if(k==='comp'){ state.compRecords = state.compRecords.filter(r=>!matcher(r.date)); }
+    else { state.records[k] = (state.records[k]||[]).filter(r=>!matcher(r.date)); }
+  });
+
+  await saveState();
+  render();
+  setStatus(`已清除 ${count} 筆紀錄`, true);
 }
 
 async function addComp(e){
