@@ -197,6 +197,9 @@ function initFirebase(){
       if(user){ await pullOrPushOnSignIn(); }
       render();
     });
+    fbAuth.getRedirectResult().catch(e=>{
+      setStatus('登入失敗：' + (e && e.message ? e.message : String(e)), false);
+    });
   }catch(e){ console.error('Firebase 初始化失敗', e); }
 }
 
@@ -204,7 +207,7 @@ async function signInWithGoogle(){
   if(!fbAuth){ setStatus('雲端同步尚未就緒，請稍後再試', false); return; }
   try{
     const provider = new firebase.auth.GoogleAuthProvider();
-    await fbAuth.signInWithPopup(provider);
+    await fbAuth.signInWithRedirect(provider);
   }catch(e){
     setStatus('登入失敗：' + (e && e.message ? e.message : String(e)), false);
   }
