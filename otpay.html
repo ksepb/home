@@ -523,6 +523,7 @@
     </div>
 
     <div class="wage-out">月工資總額合計：<b id="salaryTotal">49020</b> 元　｜　平日每小時工資額：<b id="hourlyWage">204.25</b> 元</div>
+    <p class="formula" style="margin-top:8px;">本薪、清潔獎金、夜點費會自動暫存在這台裝置的瀏覽器裡，下次打開網頁自動帶入；下方每月加班時數不會被記住，每次都要重新填寫，不會上傳到任何伺服器。</p>
   </div>
 
   <div class="card">
@@ -536,7 +537,7 @@
         <div class="grid2">
           <label for="wd-hrs">每日加班時數（小時）</label>
           <label for="wd-days">加班天數（天）</label>
-          <input type="number" id="wd-hrs" min="0" max="16" step="0.5" value="4" autocomplete="off" inputmode="decimal">
+          <input type="number" id="wd-hrs" min="0" max="16" step="0.5" value="8" autocomplete="off" inputmode="decimal">
           <select id="wd-days" class="count-select" data-max="31"></select>
         </div>
         <p class="formula" style="margin-top:6px;">超過4小時的部分，系統會自動以天災事變2倍計算。</p>
@@ -578,7 +579,7 @@
         <div class="grid2">
           <label for="off-hrs">每次出勤時數（小時）</label>
           <label for="off-days">出勤次數（天）</label>
-          <input type="number" id="off-hrs" min="0" max="24" step="0.5" value="0" autocomplete="off" inputmode="decimal">
+          <input type="number" id="off-hrs" min="0" max="24" step="0.5" value="8" autocomplete="off" inputmode="decimal">
           <select id="off-days" class="count-select" data-max="31"></select>
         </div>
         <p class="formula" style="margin-top:6px;">出勤時數請含正常8小時計算，例如出勤10小時請填10；若超過12小時，超過部分系統會自動以天災事變2倍計算，不需另外拆欄填寫。</p>
@@ -740,6 +741,46 @@ function bindLivePreview(){
   document.getElementById('off-disaster').addEventListener('change', ()=>updateLivePreviews());
 }
 
+const SETTINGS_KEY = 'otpay_settings_v1';
+const SETTINGS_FIELDS = ['salary','bonus','nightDays','nightRate'];
+
+function saveSettings(){
+  try{
+    const data = {};
+    SETTINGS_FIELDS.forEach(id=>{
+      const el = document.getElementById(id);
+      if(el) data[id] = el.value;
+    });
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(data));
+  } catch(e){
+    // 無痕模式或儲存空間受限時，安靜地放棄暫存，不影響試算功能
+  }
+}
+
+function loadSettings(){
+  try{
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if(!raw) return;
+    const data = JSON.parse(raw);
+    Object.keys(data).forEach(id=>{
+      const el = document.getElementById(id);
+      if(!el) return;
+      el.value = data[id];
+    });
+  } catch(e){
+    // 讀取失敗就沿用網頁預設值
+  }
+}
+
+function bindPersistence(){
+  SETTINGS_FIELDS.forEach(id=>{
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.addEventListener('input', saveSettings);
+    el.addEventListener('change', saveSettings);
+  });
+}
+
 function calculate(){
   const wage = updateWage();
 
@@ -825,11 +866,11 @@ function resetForm(){
   document.getElementById('bonus').value = 10000;
   document.getElementById('nightDays').value = 0;
   document.getElementById('nightRate').value = 130;
-  document.getElementById('wd-hrs').value = 4;
+  document.getElementById('wd-hrs').value = 8;
   document.getElementById('wd-days').value = 0;
   document.getElementById('rd-hrs').value = 8;
   document.getElementById('rd-days').value = 0;
-  document.getElementById('off-hrs').value = 0;
+  document.getElementById('off-hrs').value = 8;
   document.getElementById('off-days').value = 0;
   document.getElementById('off-disaster').checked = false;
   document.getElementById('hol-hrs').value = 8;
@@ -838,6 +879,7 @@ function resetForm(){
   document.getElementById('resultCard').style.display = 'none';
   document.getElementById('warnBox').innerHTML = '';
   updateWage();
+  saveSettings();
   window.scrollTo({top:0, behavior:'smooth'});
 }
 
@@ -871,9 +913,11 @@ function enableAutoSelect(){
 }
 
 populateCountSelects();
+loadSettings();
 randomizeFieldNames();
 enableAutoSelect();
 bindLivePreview();
+bindPersistence();
 autoExpand('cat-wd', ['wd-hrs','wd-days']);
 autoExpand('cat-rd', ['rd-hrs','rd-days']);
 autoExpand('cat-hol', ['hol-hrs','hol-days']);
